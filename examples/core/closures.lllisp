@@ -1,0 +1,29 @@
+;; Closures example for LLLisp
+(cImport "stdio.h")
+
+;; Main function demonstrating closures
+(def main (fn [] i32
+  (do
+    (printf "Testing closures...\n")
+    
+    ;; Define a function that creates an adder function
+    (def makeAdder (fn [(:n i32)] (fn [(:x i32)] i32 
+      (+ n x)
+    )))
+    
+    ;; Create two adder functions with different captured values
+    (def add5 (makeAdder 5))
+    (def add10 (makeAdder 10))
+    
+    ;; Use the adder functions
+    (def result1 (add5 3))
+    (def result2 (add10 3))
+    
+    ;; Print the results
+    (printf "5 + 3 = %d\n" result1)
+    (printf "10 + 3 = %d\n" result2)
+    
+    ;; Return success
+    0
+  )
+)) 

@@ -1,0 +1,76 @@
+;; Define an atom type for HTTP response codes
+(type http-resp-code atom)
+
+;; Define some HTTP response codes
+(def http-ok (http-resp-code :ok))
+(def http-not-found (http-resp-code :not-found))
+(def http-server-error (http-resp-code :server-error))
+
+;; Define a tuple type for HTTP responses
+(type http-resp (tuple http-resp-code (ptr u8)))
+
+;; Create HTTP response tuples
+(def ok-response [http-ok "Request successful"])
+(def not-found-response [http-not-found "Resource not found"])
+(def error-response [http-server-error "Internal server error"])
+
+;; Access tuple elements (would use pattern matching in a real implementation)
+(def response-code ($ [0] ok-response))
+(def response-message ($ [1] ok-response))
+
+;; Define a data type (tagged union / enum)
+(type token (data
+  [:ident (ptr u8)]        ;; Identifier token with string value
+  [:number i64]           ;; Number token with integer value
+  [:string (ptr u8)]      ;; String token with string value
+  [:whitespace]           ;; Whitespace token (no value)
+  [:newline]              ;; Newline token (no value)
+  [:eof]                  ;; End of file token (no value)
+))
+
+;; Create tokens using data constructors
+(def id-token [:ident "variable"])
+(def num-token [:number 42])
+(def str-token [:string "hello world"])
+(def ws-token [:whitespace])
+(def nl-token [:newline])
+(def eof-token [:eof])
+
+;; Define a more complex data type for a simple expression language
+(type expr (data
+  [:int i64]
+  [:var (ptr u8)]
+  [:add (tuple expr expr)]
+  [:mul (tuple expr expr)]
+))
+
+;; Create expressions
+(def e1 [:int 5])
+(def e2 [:var "x"])
+(def e3 [:add [e1 e2]])        ;; 5 + x
+(def e4 [:mul [e3 [:int 2]]])  ;; (5 + x) * 2
+
+;; Define a data type for a binary tree
+(type tree (data
+  [:leaf i32]
+  [:node (tuple tree i32 tree)]
+))
+
+;; Create a simple binary tree
+(def leaf1 [:leaf 1])
+(def leaf2 [:leaf 3])
+(def leaf3 [:leaf 5])
+(def leaf4 [:leaf 7])
+(def node1 [:node [leaf1 2 leaf2]])    ;; (1) 2 (3)
+(def node2 [:node [leaf3 6 leaf4]])    ;; (5) 6 (7)
+(def root [:node [node1 4 node2]])     ;; ((1) 2 (3)) 4 ((5) 6 (7))
+
+;; Define a result type (similar to Rust's Result)
+(type result (data
+  [:ok (ptr u8)]
+  [:err (ptr u8)]
+))
+
+;; Create result values
+(def success [:ok "Operation completed successfully"])
+(def failure [:err "Operation failed: invalid input"]) 

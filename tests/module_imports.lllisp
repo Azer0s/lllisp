@@ -1,0 +1,22 @@
+;; Test module imports and function calls in LLLisp
+
+;; Import a C header (usually for external C functions)
+(def stdio (use :header "stdio.h"))
+
+;; Import a regular module
+(def other (use "other"))
+
+;; Import a module from a subdirectory
+(def subdir-other (use "subdir/other"))
+
+;; Import with path matching the module name
+(def subdir/foo (use "subdir/foo"))
+
+;; Using the imported modules
+(stdio/printf "Hello, world!\n")
+
+(def result (other/fib 10))
+
+(subdir-other/hello)
+
+(subdir/foo/bar "hello") 

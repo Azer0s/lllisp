@@ -1,0 +1,77 @@
+;; For Loops Example
+;; This file demonstrates the for loop syntax in LLLisp
+
+;; Range-based for loop with list
+(out "Iterating over a list:\n")
+(for (range item (list "Hello" "World" "LLLisp"))
+    (do
+        (out item)
+        (out "\n")
+    )
+)
+
+;; Range-based for loop with numeric range
+(out "\nCounting from 0 to 9:\n")
+(for (range i (to 10))
+    (do
+        (out i)
+        (out " ")
+    )
+)
+(out "\n")
+
+;; Condition-based for loop (like while loop)
+(out "\nCondition-based loop:\n")
+(def counter 0)
+(for (< counter 5)
+    (do
+        (out "Counter: ")
+        (out counter)
+        (out "\n")
+        (def counter (+ counter 1))
+    )
+)
+
+;; Loop with early termination condition
+(out "\nLoop with termination condition:\n")
+(def i 0)
+(for (< i 10)
+    (do
+        (out "Iteration ")
+        (out i)
+        (out "\n")
+        (def i (+ i 1))
+        
+        ;; Simulate early termination with a condition
+        (if (>= i 3)
+            (def i 10)  ;; Force the loop condition to fail
+        )
+    )
+)
+
+;; Nested for loops
+(out "\nNested for loops:\n")
+(for (range i (to 3))
+    (for (range j (to 3))
+        (do
+            (out "(")
+            (out i)
+            (out ",")
+            (out j)
+            (out ") ")
+        )
+    )
+    (out "\n")
+)
+
+;; For loop with complex expressions
+(out "\nSquares of numbers:\n")
+(for (range n (to 5))
+    (do
+        (def square (* n n))
+        (out n)
+        (out "² = ")
+        (out square)
+        (out "\n")
+    )
+) 

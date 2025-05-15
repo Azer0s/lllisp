@@ -1,0 +1,31 @@
+;; LLLisp Module Example
+;; This example demonstrates module imports and nested module paths
+
+;; Import modules
+(def stdio (use :header "stdio.h"))  ; Import a C header
+(def math (use "math.ll"))           ; Import a regular module
+(def graphics (use "graphics.ll"))   ; Import another module
+
+;; Basic module function calls
+(stdio/printf "Hello, %s!\n" "world")  ; Call printf from stdio module (C headers must use direct calls)
+(def sqrt_result (math/sqrt 16))      ; Call sqrt from math module
+(stdio/printf "Square root of 16 is %f\n" sqrt_result)
+
+;; Nested module paths
+;; These demonstrate how to access functions in nested module hierarchies
+;; Note: Only regular modules (not C headers) can use nested paths
+
+;; Call a deeply nested UI function from a regular module
+(graphics/ui/button/render "Click Me" 100 200 150 50)
+
+;; Call string formatting functions from a nested module
+(stdio/printf "Formatted string: %s\n" 
+  (graphics/util/string/format/pad-left "Hello" 10 " "))
+
+;; Create our own module hierarchy
+(def my-module/math/operations/basic (fn [x y]
+  (+ x y)))
+
+;; Call our nested module function
+(stdio/printf "Custom module function result: %d\n" 
+  (my-module/math/operations/basic 5 7)) 

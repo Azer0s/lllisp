@@ -1,0 +1,31 @@
+;; Define a union type for small integers
+(type small-int (union i8 i16))
+
+;; Define a union type that includes the small-int union
+(type number-type (union small-int f32))
+
+;; Create values of each type
+(def a (small-int 42))
+(def b (number-type 3.14))
+(def c (number-type (small-int 100)))
+
+;; Test type checking
+(def a-is-i8 (is i8 a))
+(def b-is-f32 (is f32 b))
+(def c-is-small-int (is small-int c))
+(def c-is-i16 (is i16 c)) 
+(type small-int (union i8 i16))
+
+;; Define a union type that includes the small-int union
+(type number-type (union small-int f32))
+
+;; Create values of each type
+(def a (small-int 42))
+(def b (number-type 3.14))
+(def c (number-type (small-int 100)))
+
+;; Test type checking
+(def a-is-i8 (is i8 a))
+(def b-is-f32 (is f32 b))
+(def c-is-small-int (is small-int c))
+(def c-is-i16 (is i16 c)) 

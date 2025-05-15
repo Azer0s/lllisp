@@ -1,0 +1,59 @@
+;; Define a 2D vector struct type
+(type vector (struct (:x f64) (:y f64)))
+
+;; Define a 3D vector struct type
+(type vector3d (struct (:x f64) (:y f64) (:z f64)))
+
+;; Define a rectangle struct type
+(type rectangle (struct (:top-left vector) (:width f64) (:height f64)))
+
+;; Create a vector instance
+(def v1 (vector 1.2 3.4))
+
+;; Access vector fields
+(def x ($ :x v1))  ;; x = 1.2
+(def y ($ :y v1))  ;; y = 3.4
+
+;; Update vector fields
+($ :x v1 5.0)      ;; v1.x = 5.0
+
+;; Create a rectangle
+(def rect (rectangle (vector 0.0 0.0) 10.0 20.0))
+
+;; Access nested fields
+(def rect-x ($ :x ($ :top-left rect)))  ;; rect.top-left.x = 0.0
+
+;; Update nested fields
+($ :x ($ :top-left rect) 1.0)  ;; rect.top-left.x = 1.0
+
+;; Define an array of vectors
+(type vector-array [vector, 10])
+(def points (vector-array))
+
+;; Set array elements
+($ [0] points (vector 1.0 2.0))
+($ [1] points (vector 3.0 4.0))
+
+;; Access array element fields
+(def point0-y ($ :y ($ [0] points)))  ;; points[0].y = 2.0
+
+;; Direct memory manipulation (for low-level operations)
+(def screen-buffer (addr 47104))  ;; 47104 is decimal for 0xB8000
+($ screen-buffer 65)  ;; Write ASCII 'A' to screen buffer
+
+;; Define a person struct with an array field
+(type person (struct
+    (:name [i8, 32])  ;; Fixed-size string
+    (:age i32)
+    (:is-active bool)
+))
+
+;; Create a person
+(def john (person "John Doe" 42 true))
+
+;; Access fields
+(def johns-age ($ :age john))  ;; 42
+
+;; Update fields
+($ :age john 43)  ;; john.age = 43
+($ :is-active john false)  ;; john.is-active = false 

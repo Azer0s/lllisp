@@ -1,0 +1,3 @@
+;; Module function call
+
+(stdio/printf "Hello, world!\n") 

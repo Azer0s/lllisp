@@ -1,0 +1,33 @@
+;; Test file for union types in LLLisp
+
+;; Define a simple union type (u8 or f32)
+(type number-type (union u8 f32))
+
+;; Test union constructor with integer
+(def x (number-type 42))
+
+;; Test union constructor with float
+(def y (number-type 3.14))
+
+;; Test type check operator returning true
+(def is-float (is f32 y))
+
+;; Test type check operator returning false
+(def not-float (is f32 x))
+
+;; Define a more complex union with multiple types
+(type any-type (union u8 f32 bool))
+
+;; Test with a boolean value
+(def z (any-type true))
+
+;; Type checking against multiple members of the union
+(def z-is-bool (is bool z))
+(def z-is-not-int (is u8 z))
+
+;; Nested unions
+(type nested-union (union (ptr i32) (union i8 i16)))
+(def n (nested-union 10))  ;; Should get inferred as the inner union's i16
+
+;; Type checking with nested unions
+(def n-is-small-int (is i16 n)) 

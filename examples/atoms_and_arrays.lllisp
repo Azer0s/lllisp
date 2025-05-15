@@ -1,0 +1,30 @@
+;; LLLisp example demonstrating atom types and array syntax
+;; Atoms are symbolic constants similar to Elixir atoms or Ruby symbols
+
+;; Define type aliases
+(type char u8)
+(type string (ptr char))
+(type result atom)  ;; Using the new atom type
+(type int-array [i32, 10]) ;; Using the new array syntax with commas
+
+;; Using atoms as constants
+(def ok :ok)
+(def error :error)
+(def pending :pending)
+
+;; Function to check if a status is successful (this is pseudocode)
+;; (func is-ok ((status result)) bool
+;;   (== status :ok))
+
+;; Creating an array
+(def numbers [i32, 5])
+
+;; Creating a result value
+(def operation-result (result :ok))
+
+;; Example of handling different status values
+;; (match operation-result
+;;   (:ok (println "Operation succeeded"))
+;;   (:error (println "Operation failed"))
+;;   (:pending (println "Operation pending"))
+;;   (_ (println "Unknown status"))) 

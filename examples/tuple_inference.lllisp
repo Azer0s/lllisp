@@ -1,0 +1,59 @@
+;; Tuple Type Inference Example
+;; This demonstrates how LLLisp can infer types for tuple literals
+
+;; Define a tuple with mixed types
+(def mixed_tuple [42 true null])
+;; The type is inferred as [i32 bool (ptr void)]
+
+;; Define a tuple with all integers
+(def int_tuple [1 2 3])
+;; The type is inferred as [i32 i32 i32]
+
+;; Define a tuple with a string and an atom
+(def string_atom_tuple ["hello" :world])
+;; The type is inferred as [[i8] atom]
+
+;; Define a nested tuple
+(def nested_tuple [[1 2] [3 4]])
+;; The type is inferred as [[i32 i32] [i32 i32]]
+
+;; Define a type for a function that takes a tuple and returns an integer
+(type tuple_accessor (fn [(tuple i32 i32 i32)] i32))
+
+;; Define a type for a function that creates a tuple
+(type tuple_creator (fn [i32 bool] [i32 bool]))
+
+;; Define a type for a function that processes a mixed tuple
+(type mixed_processor (fn [[i32 bool (ptr void)]] i32))
+
+;; Define a type for accessing elements from nested tuples
+(type nested_accessor (fn [[[i32 i32] [i32 i32]]] i32)) 
+;; This demonstrates how LLLisp can infer types for tuple literals
+
+;; Define a tuple with mixed types
+(def mixed_tuple [42 true null])
+;; The type is inferred as [i32 bool (ptr void)]
+
+;; Define a tuple with all integers
+(def int_tuple [1 2 3])
+;; The type is inferred as [i32 i32 i32]
+
+;; Define a tuple with a string and an atom
+(def string_atom_tuple ["hello" :world])
+;; The type is inferred as [[i8] atom]
+
+;; Define a nested tuple
+(def nested_tuple [[1 2] [3 4]])
+;; The type is inferred as [[i32 i32] [i32 i32]]
+
+;; Define a type for a function that takes a tuple and returns an integer
+(type tuple_accessor (fn [(tuple i32 i32 i32)] i32))
+
+;; Define a type for a function that creates a tuple
+(type tuple_creator (fn [i32 bool] [i32 bool]))
+
+;; Define a type for a function that processes a mixed tuple
+(type mixed_processor (fn [[i32 bool (ptr void)]] i32))
+
+;; Define a type for accessing elements from nested tuples
+(type nested_accessor (fn [[[i32 i32] [i32 i32]]] i32)) 

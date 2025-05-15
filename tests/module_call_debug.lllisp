@@ -1,0 +1,6 @@
+;; Simple test for module function call parsing
+
+(def math (use "math.ll"))
+
+;; Test a module function call
+(math/sqrt 16) 

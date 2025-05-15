@@ -1,0 +1,41 @@
+;; Define a simple when macro
+;; when is like if without an else branch
+(def when (macro [condition body]
+  `(if ~condition ~body null)))
+
+;; Define an unless macro
+;; unless is like if with the condition negated
+(def unless (macro [condition body]
+  `(if (== ~condition false) ~body null)))
+
+;; Define an apply macro that applies a function to arguments
+(def apply (macro [func args]
+  `(~func ~@args)))
+
+;; Test the when macro
+(def test-when (fn [] bool
+  (do
+    (when (< 5 10)
+      (stdio/printf "5 is less than 10\n"))
+    true)))
+
+;; Test the unless macro
+(def test-unless (fn [] bool
+  (do
+    (unless (> 5 10)
+      (stdio/printf "5 is not greater than 10\n"))
+    true)))
+
+;; Test the apply macro
+(def test-apply (fn [] i32
+  (apply + [1 2 3 4])))
+
+;; Test OS-specific code
+(def test-os-specific (fn [] void
+  (do
+    (os/when "darwin"
+      (stdio/printf "Running on macOS\n"))
+    (os/when "linux"
+      (stdio/printf "Running on Linux\n"))
+    (os/when "windows"
+      (stdio/printf "Running on Windows\n"))))) 

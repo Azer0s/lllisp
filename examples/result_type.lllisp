@@ -1,0 +1,72 @@
+;; Result type example demonstrating atom literals and array syntax
+;; This implements a simple Result-like type using the new atom syntax
+
+;; Define our atom types
+(type result-type atom)    ;; will contain :ok or :error
+(type error-code atom)     ;; various error codes like :not_found, :permission_denied, etc.
+
+;; Define our Result type as a tuple of result-type, value, and error
+(type result [result-type, i32, error-code])
+
+;; Helper function to create a successful result
+(fn ok [value: i32] -> result
+    (result :ok value :none))
+
+;; Helper function to create an error result
+(fn error [code: error-code] -> result
+    (result :error 0 code))
+
+;; Function to check if a result is ok
+(fn is-ok [r: result] -> bool
+    (== (nth r 0) :ok))
+
+;; Function to check if a result is an error
+(fn is-error [r: result] -> bool
+    (== (nth r 0) :error))
+
+;; Function to get the value from a result
+(fn get-value [r: result] -> i32
+    (if (is-ok r)
+        (nth r 1)  ;; Return the value
+        0))        ;; Default value for errors
+
+;; Function to get the error code from a result
+(fn get-error [r: result] -> error-code
+    (if (is-error r)
+        (nth r 2)  ;; Return the error code
+        :none))    ;; Default error code
+
+;; Example function that might succeed or fail
+(fn divide [a: i32, b: i32] -> result
+    (if (== b 0)
+        (error :division_by_zero)  ;; Return an error
+        (ok (/ a b))))            ;; Return the result
+
+;; Example usage
+(def success (divide 10 2))
+(def failure (divide 10 0))
+
+;; Check the results
+(def is-success-ok (is-ok success))         ;; true
+(def success-value (get-value success))     ;; 5
+(def is-failure-error (is-error failure))   ;; true
+(def failure-code (get-error failure))      ;; :division_by_zero
+
+;; Example with arrays
+(type result-array [result, 2])
+
+(fn create-results [] -> result-array
+    (result-array (divide 10 2) (divide 10 0)))
+
+(def results (create-results))
+(def first-result (nth results 0))
+(def second-result (nth results 1))
+
+;; Function that handles multiple results
+(fn count-successes [arr: result-array, len: i32] -> i32
+    (if (== len 0)
+        0
+        (+ (if (is-ok (nth arr (- len 1))) 1 0)
+           (count-successes arr (- len 1)))))
+
+(def success-count (count-successes results 2)) 

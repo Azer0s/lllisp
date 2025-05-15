@@ -1,0 +1,26 @@
+[package]
+name = "lllisp"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "lllisp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lllisp"
+path = "src/main.rs"
+
+[[bin]]
+name = "debug_module_call_explicit"
+path = "tests/debug_module_call_explicit.rs"
+
+[dependencies]
+inkwell = { version = "0.2.0", features = ["llvm15-0"] }
+structopt = "0.3"
+clang = "2.0"
+llvm-sys = "150.2.1"
+clang-sys = { version = "1.6.1", features = ["runtime"] }
+tempfile = "3.10.1"
+regex = "1.10.2"
+chumsky = "0.8.0"

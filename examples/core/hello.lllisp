@@ -1,0 +1,10 @@
+;; Hello World example for LLLisp
+(cImport "stdio.h")
+
+;; Main function
+(def main (fn [] i32
+  (do
+    (printf "Hello, world!\n")
+    0
+  )
+)) 

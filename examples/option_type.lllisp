@@ -1,0 +1,74 @@
+;; Option type example demonstrating atom literals and array syntax
+;; This implements a simple Option-like type using the new atom syntax
+
+;; Define our option tag type
+(type option-tag atom)   ;; will contain :some or :none
+
+;; Define our Option type as a tuple of option-tag and value
+(type option [option-tag, i32])
+
+;; Helper function to create a Some variant
+(fn some [value: i32] -> option
+    (option :some value))
+
+;; Helper function to create a None variant
+(fn none [] -> option
+    (option :none 0))
+
+;; Function to check if an option is Some
+(fn is-some [o: option] -> bool
+    (== (nth o 0) :some))
+
+;; Function to check if an option is None
+(fn is-none [o: option] -> bool
+    (== (nth o 0) :none))
+
+;; Function to get the value from an option
+(fn get-value [o: option] -> i32
+    (if (is-some o)
+        (nth o 1)   ;; Return the value
+        0))         ;; Default value for None
+
+;; Function to provide a default value for None
+(fn unwrap-or [o: option, default: i32] -> i32
+    (if (is-some o)
+        (nth o 1)
+        default))
+
+;; Example function that might return Some or None
+(fn safe-divide [a: i32, b: i32] -> option
+    (if (== b 0)
+        (none)
+        (some (/ a b))))
+
+;; Example usage
+(def success (safe-divide 10 2))
+(def failure (safe-divide 10 0))
+
+;; Check the options
+(def is-success-some (is-some success))           ;; true
+(def success-value (get-value success))           ;; 5
+(def failure-with-default (unwrap-or failure 42)) ;; 42
+
+;; Example with arrays
+(type option-array [option, 3])
+
+(fn create-options [] -> option-array
+    (option-array 
+        (safe-divide 10 2)
+        (safe-divide 10 0)
+        (some 42)))
+
+(def options (create-options))
+(def first-option (nth options 0))
+(def second-option (nth options 1))
+(def third-option (nth options 2))
+
+;; Function that maps over all Some values
+(fn sum-options [arr: option-array, len: i32] -> i32
+    (if (== len 0)
+        0
+        (+ (unwrap-or (nth arr (- len 1)) 0)
+           (sum-options arr (- len 1)))))
+
+(def total (sum-options options 3)) 

@@ -1,0 +1,97 @@
+;; Control Flow Example
+;; This file demonstrates control flow in LLLisp using if conditions and for loops
+
+;; Function to check if a number is even
+(def is_even 
+    (fn (n)
+        (= (% n 2) 0)
+    )
+)
+
+;; Function to check if a number is prime
+(def is_prime
+    (fn (n)
+        (if (<= n 1)
+            false
+            (if (= n 2)
+                true
+                (if (= (% n 2) 0)
+                    false
+                    (do
+                        (def result true)
+                        (def i 3)
+                        (for (and (< i (sqrt n)) result)
+                            (do
+                                (if (= (% n i) 0)
+                                    (def result false)
+                                )
+                                (def i (+ i 2))
+                            )
+                        )
+                        result
+                    )
+                )
+            )
+        )
+    )
+)
+
+;; Print numbers from 1 to 20 with labels
+(out "Numbers from 1 to 20:\n")
+(for (range i (to 20))
+    (do
+        (def num (+ i 1))  ;; Start from 1 instead of 0
+        (out num)
+        (out ": ")
+        
+        ;; Check properties of the number
+        (if (is_even num)
+            (out "even")
+            (out "odd")
+        )
+        
+        (if (is_prime num)
+            (out ", prime")
+        )
+        
+        (out "\n")
+    )
+)
+
+;; Fibonacci sequence
+(out "\nFibonacci Sequence (first 10 numbers):\n")
+(def a 0)
+(def b 1)
+(out a)
+(out " ")
+(out b)
+(out " ")
+
+(for (range _ (to 8))  ;; Generate 8 more numbers (total 10)
+    (do
+        (def temp (+ a b))
+        (out temp)
+        (out " ")
+        (def a b)
+        (def b temp)
+    )
+)
+(out "\n")
+
+;; Pattern printing using nested loops
+(out "\nPattern:\n")
+(for (range i (to 5))
+    (do
+        ;; Print spaces
+        (for (range _ (to (- 4 i)))
+            (out " ")
+        )
+        
+        ;; Print stars
+        (for (range _ (to (+ (* 2 i) 1)))
+            (out "*")
+        )
+        
+        (out "\n")
+    )
+) 

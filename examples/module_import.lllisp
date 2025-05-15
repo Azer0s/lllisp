@@ -1,0 +1,25 @@
+;; Example module imports and function calls
+
+;; Import modules
+(def stdio (use :header "stdio.h"))
+(def math (use "math"))
+(def utils (use "utils"))
+
+;; Basic module function call
+(stdio/printf "Hello, world!\n")
+
+;; Module function call with multiple arguments
+(stdio/fprintf stderr "Error: %s\n" "Something went wrong")
+
+;; Using a module function call result
+(def result (math/sqrt 16.0))
+
+;; Nested module function calls
+(stdio/printf "Result: %f\n" (math/pow result 2.0))
+
+;; Module function call with no arguments
+(utils/initialize)
+
+;; Assigning a module function to a variable
+(def print-func stdio/printf)
+(print-func "Using function variable\n") 

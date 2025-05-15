@@ -1,0 +1,57 @@
+;; LLLisp example showing new syntax features
+
+;; Type definitions
+(type int i32)
+(type float f32)
+(type str (ptr u8))
+(type status atom)  ;; New: atom type
+
+;; Arrays with comma syntax
+(type int-array [i32, 10])  ;; New: comma instead of semicolon
+(type matrix [int-array, 5])
+
+;; Atoms as symbolic constants
+(def ok :ok)           ;; New: atom literal syntax with colon
+(def error :error)
+(def pending :pending)
+
+;; Variables with types
+(def x (int 42))
+(def message (str "Hello"))
+(def numbers [int, 5])  ;; Array with new syntax
+(def result (status :ok))  ;; Using atom type and literal
+
+;; Future direction: pattern matching on atom types
+;; (match result
+;;   (:ok (print "Success!"))
+;;   (:error (print "Failed!"))
+;;   (:pending (print "Still working..."))
+;;   (_ (print "Unknown status"))) 
+
+;; Type definitions
+(type int i32)
+(type float f32)
+(type str (ptr u8))
+(type status atom)  ;; New: atom type
+
+;; Arrays with comma syntax
+(type int-array [i32, 10])  ;; New: comma instead of semicolon
+(type matrix [int-array, 5])
+
+;; Atoms as symbolic constants
+(def ok :ok)           ;; New: atom literal syntax with colon
+(def error :error)
+(def pending :pending)
+
+;; Variables with types
+(def x (int 42))
+(def message (str "Hello"))
+(def numbers [int, 5])  ;; Array with new syntax
+(def result (status :ok))  ;; Using atom type and literal
+
+;; Future direction: pattern matching on atom types
+;; (match result
+;;   (:ok (print "Success!"))
+;;   (:error (print "Failed!"))
+;;   (:pending (print "Still working..."))
+;;   (_ (print "Unknown status"))) 

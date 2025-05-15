@@ -1,0 +1,7 @@
+;; Define a simple when macro
+(def when (macro [condition body]
+  `(if ~condition ~body null)))
+
+;; Test the when macro
+(when (< 5 10)
+  (+ 1 2)) 

@@ -1,0 +1,29 @@
+;; Type alias examples
+(type char u8)
+(type str (ptr char))
+(type int_ptr (ptr i32))
+(type float_array [f32])
+(type char_array_5 [char; 5])
+
+;; Variable declarations with explicit types
+(def a (i32 42))
+(def b (ptr i32 (addr a)))
+(def c (f32 3.14))
+(def d bool)  ;; type only, no initializer
+
+;; Array examples
+(def buffer [u8, 256])
+(def dynamic_array [f64])
+
+;; Using type aliases
+(def character (char 97))  ;; ASCII 'a'
+(def message (str "Hello, world!"))
+(def numbers (int_ptr (addr a)))
+(def samples (float_array (f32 1.0) (f32 2.0) (f32 3.0)))
+
+;; Nested pointer example
+(def ptr_to_ptr (ptr (ptr i8) (addr b)))
+
+;; Memory operations
+(def value_of_a (deref b))  ;; Should be 42
+(def address_of_c (addr c)) 

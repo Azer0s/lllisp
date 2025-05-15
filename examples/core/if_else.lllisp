@@ -1,0 +1,51 @@
+;; Conditional statements example for LLLisp
+(cImport "stdio.h")
+
+;; Main function with if-else expressions
+(def main (fn [] i32
+  (do
+    (printf "Testing conditionals...\n")
+    
+    ;; Define some values
+    (def a 10)
+    (def b 5)
+    
+    ;; Test equality
+    (def equal (= a b))
+    (printf "Is 10 equal to 5? %d\n" equal)
+    
+    ;; Test less than
+    (def less_than (< a b))
+    (printf "Is 10 less than 5? %d\n" less_than)
+    
+    ;; Test greater than
+    (def greater_than (> a b))
+    (printf "Is 10 greater than 5? %d\n" greater_than)
+    
+    ;; If-else example
+    (def max_value 
+      (if (> a b)
+        a
+        b
+      )
+    )
+    (printf "Maximum value: %d\n" max_value)
+    
+    ;; More complex if-else
+    (def description
+      (if (> a b)
+        (do
+          (printf "a is greater than b\n")
+          a
+        )
+        (do
+          (printf "a is not greater than b\n")
+          b
+        )
+      )
+    )
+    
+    ;; Return success
+    0
+  )
+)) 

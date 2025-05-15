@@ -1,0 +1,25 @@
+;; Type inference example
+;; Numbers default to i32, or i64/i128 when needed
+(def small_int 42)
+(def medium_int 2147483648)  ;; Greater than i32::MAX, should be i64
+(def large_int 9223372036854775808)  ;; Greater than i64::MAX, should be i128
+
+;; Floats default to f32, or f64 when precision requires it
+(def simple_float 3.14)
+(def precise_float 3.141592653589793238)  ;; Requires f64 for accuracy
+
+;; Other types
+(def flag true)  ;; Boolean
+(def character 'A')  ;; Char (u8)
+(def message "Hello, LLLisp!")  ;; String (ptr u8)
+
+;; Using inferred types with other operations
+(def int_ptr (addr small_int))  ;; Should be (ptr i32)
+(def char_ptr (addr character))  ;; Should be (ptr u8)
+
+;; Complex expressions with type inference
+(def int_value (deref int_ptr))  ;; Should infer to i32
+
+;; Type aliases with inferred types
+(type int_ref (ptr i32))
+(def num_ref (int_ref (addr small_int))) 

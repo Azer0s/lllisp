@@ -1,0 +1,22 @@
+;; Simple test for LLLisp
+(cImport "stdio.h")
+
+;; Define a simple function
+(def add5 (fn [(:x i32)] i32
+  (+ x 5)
+))
+
+;; Main function
+(def main (fn [] i32
+  (do
+    (printf "Testing simple function...\n")
+    
+    ;; Call the function
+    (def result (add5 7))
+    
+    ;; Print the result
+    (printf "7 + 5 = %d\n" result)
+    
+    0
+  )
+)) 

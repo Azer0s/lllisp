@@ -1,0 +1,13 @@
+;; Test file for module imports and function calls
+
+(def stdio (use :header "stdio.h"))
+(def math (use "math.ll"))
+
+;; Call stdio/printf
+(stdio/printf "This is a test: %d\n" 42)
+
+;; Call math/sqrt
+(def result (math/sqrt 16))
+
+;; Check the result
+(stdio/printf "Square root result: %f\n" result) 

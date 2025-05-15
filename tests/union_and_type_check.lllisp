@@ -1,0 +1,5 @@
+(type NumOrBool (union u8 bool))
+(def x (NumOrBool 42))
+(def y (NumOrBool true)) 
+(def x (NumOrBool 42))
+(def y (NumOrBool true)) 

@@ -1,0 +1,51 @@
+;; Higher-order functions example for LLLisp
+(cImport "stdio.h")
+
+;; Define a function that applies a function twice
+(def applyTwice (fn [(:f (fn [(i32)] i32)) (:x i32)] i32
+  (f (f x))
+))
+
+;; Define a function that increments a number
+(def increment (fn [(:x i32)] i32
+  (+ x 1)
+))
+
+;; Define a function that doubles a number
+(def double (fn [(:x i32)] i32
+  (* x 2)
+))
+
+;; Main function
+(def main (fn [] i32
+  (do
+    (printf "Testing higher-order functions...\n")
+    
+    ;; Apply increment twice to 5 (5+1+1 = 7)
+    (def result1 (applyTwice increment 5))
+    (printf "Applying increment twice to 5: %d\n" result1)
+    
+    ;; Apply double twice to 3 (3*2*2 = 12)
+    (def result2 (applyTwice double 3))
+    (printf "Applying double twice to 3: %d\n" result2)
+    
+    ;; Define a function that creates a multiplier function
+    (def createMultiplier (fn [(:factor i32)] (fn [(:x i32)] i32
+      (* factor x)
+    )))
+    
+    ;; Create a function that multiplies by 3
+    (def triple (createMultiplier 3))
+    
+    ;; Use the triple function
+    (def result3 (triple 4))
+    (printf "Triple 4: %d\n" result3)
+    
+    ;; Apply triple twice to 2 (2*3*3 = 18)
+    (def result4 (applyTwice triple 2))
+    (printf "Applying triple twice to 2: %d\n" result4)
+    
+    ;; Return success
+    0
+  )
+)) 

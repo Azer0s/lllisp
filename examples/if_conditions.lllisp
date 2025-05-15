@@ -1,0 +1,65 @@
+;; If Conditions Example
+;; This file demonstrates the if condition syntax in LLLisp
+
+;; Basic if with else branch
+(def x 10)
+(def y 5)
+
+(def max_value 
+    (if (> x y)
+        x    ;; then branch
+        y    ;; else branch
+    )
+)
+
+(out "Max value is: ")
+(out max_value)
+(out "\n")
+
+;; If without else branch
+(def z 7)
+(if (< z 10)
+    (out "z is less than 10\n")
+)
+
+;; Nested if conditions
+(def result 
+    (if (> x y)
+        (if (> x z)
+            (do 
+                (out "x is the largest\n")
+                x
+            )
+            (do
+                (out "z is the largest\n")
+                z
+            )
+        )
+        (if (> y z)
+            (do
+                (out "y is the largest\n")
+                y
+            )
+            (do
+                (out "z is the largest\n")
+                z
+            )
+        )
+    )
+)
+
+(out "The largest value is: ")
+(out result)
+(out "\n")
+
+;; If with complex expressions
+(def absolute_diff
+    (if (> x y)
+        (- x y)  ;; x - y when x > y
+        (- y x)  ;; y - x when y >= x
+    )
+)
+
+(out "Absolute difference between x and y: ")
+(out absolute_diff)
+(out "\n") 

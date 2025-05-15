@@ -1,0 +1,33 @@
+;; Arithmetic operations example for LLLisp
+(cImport "stdio.h")
+
+;; Main function with arithmetic operations
+(def main (fn [] i32
+  (do
+    (printf "Arithmetic operations:\n")
+    
+    ;; Addition
+    (def a 5)
+    (def b 10)
+    (def sum (+ a b))
+    (printf "5 + 10 = %d\n" sum)
+    
+    ;; Subtraction
+    (def diff (- b a))
+    (printf "10 - 5 = %d\n" diff)
+    
+    ;; Multiplication
+    (def product (* a b))
+    (printf "5 * 10 = %d\n" product)
+    
+    ;; Division
+    (def quotient (/ b a))
+    (printf "10 / 5 = %d\n" quotient)
+    
+    ;; Modulo
+    (def remainder (% b a))
+    (printf "10 %% 5 = %d\n" remainder)
+    
+    0
+  )
+)) 

@@ -1,0 +1,7 @@
+(def mixed_tuple [42 true null])
+(def int_tuple [1 2 3])
+(def string_atom_tuple ["hello" :world])
+(def nested_tuple [[1 2] [3 4]]) 
+(def int_tuple [1 2 3])
+(def string_atom_tuple ["hello" :world])
+(def nested_tuple [[1 2] [3 4]]) 
