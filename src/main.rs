@@ -201,7 +201,7 @@ fn _display_form(form: &lllisp::TopLevel) {
         lllisp::TopLevelKind::Expr(expr) => {
             println!("Expr: {:?}", expr);
         },
-        lllisp::TopLevelKind::MacroDef { name, params, body } => {
+        lllisp::TopLevelKind::MacroDef { name, params, body: _ } => {
             println!("MacroDef: {} with {} params", name, params.len());
         },
         lllisp::TopLevelKind::Alias { name, module, function } => {
