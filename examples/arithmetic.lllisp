@@ -1,5 +1,5 @@
 ;; Arithmetic operations example for LLLisp
-(cImport "stdio.h")
+(def stdio (use :header "stdio.h"))
 
 ;; Main function with arithmetic operations
 (def main (fn [] i32

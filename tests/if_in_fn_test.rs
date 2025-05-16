@@ -14,11 +14,12 @@ fn test_if_in_var_def() {
     if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
         assert_eq!(name, "max-value");
         if let ExprKind::If { condition, then_branch, else_branch } = &value.node {
-            // Verify condition is a binary operation
-            if let ExprKind::Binary { .. } = &condition.node {
-                assert!(true, "Condition is a binary expression");
+            // Verify condition is a function call
+            if let ExprKind::Call { name, args } = &condition.node {
+                assert_eq!(name, ">");
+                assert_eq!(args.len(), 2);
             } else {
-                panic!("Expected Binary expression, got: {:?}", condition.node);
+                panic!("Expected function call to '>', got: {:?}", condition.node);
             }
             
             // Verify else branch exists

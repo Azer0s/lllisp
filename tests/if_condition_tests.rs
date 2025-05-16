@@ -24,11 +24,12 @@ fn test_basic_if_condition() {
     if let TopLevelKind::VarDef { name, value } = &program.forms[2].node {
         assert_eq!(name, "max_value");
         if let ExprKind::If { condition, then_branch, else_branch } = &value.node {
-            // Check condition is a binary operation
-            if let ExprKind::Binary { op, .. } = &condition.node {
-                assert_eq!(format!("{:?}", op), "Gt");
+            // Check condition is a function call to ">"
+            if let ExprKind::Call { name, args } = &condition.node {
+                assert_eq!(name, ">");
+                assert_eq!(args.len(), 2);
             } else {
-                panic!("Expected Binary operation in condition, got {:?}", condition.node);
+                panic!("Expected function call to '>' in condition, got {:?}", condition.node);
             }
             
             // Check then branch is symbol x
@@ -204,4 +205,65 @@ fn test_nested_if_conditions() {
     let mut inferer = TypeInferer::new();
     let processed = inferer.process_program(&program);
     assert!(processed.is_ok(), "Nested if conditions should type check");
+}
+
+#[test]
+fn test_if_condition() {
+    let input = r#"
+    (if (< 5 10) true false)
+    "#;
+    
+    let program = parse_program(input).unwrap();
+    
+    // Check that there's one top-level expression
+    assert_eq!(program.forms.len(), 1);
+    
+    // Get the first form and check that it's an expression
+    let form = &program.forms[0];
+    if let TopLevelKind::Expr(expr) = &form.node {
+        // Verify that the expression is an if statement
+        if let ExprKind::If { condition, then_branch, else_branch } = expr {
+            // Check the condition is a function call to "<"
+            if let ExprKind::Call { name, args } = &condition.node {
+                assert_eq!(name, "<");
+                assert_eq!(args.len(), 2);
+                // Check arguments
+                if let ExprKind::Literal(lllisp::ast::Literal::Integer(val)) = &args[0].node {
+                    assert_eq!(*val, 5);
+                } else {
+                    panic!("Expected literal 5, got {:?}", args[0].node);
+                }
+                
+                if let ExprKind::Literal(lllisp::ast::Literal::Integer(val)) = &args[1].node {
+                    assert_eq!(*val, 10);
+                } else {
+                    panic!("Expected literal 10, got {:?}", args[1].node);
+                }
+            } else {
+                panic!("Expected function call to '<', got {:?}", condition.node);
+            }
+            
+            // Check then branch is true
+            if let ExprKind::Literal(lllisp::ast::Literal::Boolean(val)) = &then_branch.node {
+                assert!(*val, "Then branch should be true");
+            } else {
+                panic!("Expected boolean literal in then branch, got {:?}", then_branch.node);
+            }
+            
+            // Check else branch is false
+            if let Some(else_expr) = else_branch {
+                if let ExprKind::Literal(lllisp::ast::Literal::Boolean(val)) = &else_expr.node {
+                    assert!(!*val, "Else branch should be false");
+                } else {
+                    panic!("Expected boolean literal in else branch, got {:?}", else_expr.node);
+                }
+            } else {
+                panic!("Expected else branch");
+            }
+        } else {
+            panic!("Expected If expression, got {:?}", expr);
+        }
+    } else {
+        panic!("Expected expression, got {:?}", form.node);
+    }
 } 

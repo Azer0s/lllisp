@@ -1,4 +1,4 @@
-use lllisp::ast::{TopLevelKind};
+use lllisp::ast::{TopLevelKind, ExprKind, Literal};
 use lllisp::parser::parse_program;
 use lllisp::type_inference::TypeInferer;
 
@@ -16,22 +16,45 @@ fn test_module_ast() {
     // Verify the AST structure
     assert_eq!(parsed_program.forms.len(), 2);
     
-    // Check the stdio module import
-    if let TopLevelKind::ModuleImport { name, path, is_header } = &parsed_program.forms[0].node {
+    // Check the stdio module import (this is actually parsed as a VarDef)
+    if let TopLevelKind::VarDef { name, value } = &parsed_program.forms[0].node {
         assert_eq!(name, "stdio");
-        assert_eq!(path, "stdio.h");
-        assert!(is_header);
+        if let ExprKind::Call { name: call_name, args } = &value.node {
+            assert_eq!(call_name, "use");
+            assert_eq!(args.len(), 2);
+            if let ExprKind::Literal(Literal::Atom(atom)) = &args[0].node {
+                assert_eq!(atom, "header");
+            } else {
+                panic!("Expected first argument to be :header atom");
+            }
+            if let ExprKind::Literal(Literal::String(path)) = &args[1].node {
+                assert_eq!(path, "stdio.h");
+            } else {
+                panic!("Expected second argument to be a string path");
+            }
+        } else {
+            panic!("Expected value to be a Call to 'use'");
+        }
     } else {
-        panic!("Expected first form to be a ModuleImport");
+        panic!("Expected first form to be a VarDef");
     }
     
     // Check the math module import
-    if let TopLevelKind::ModuleImport { name, path, is_header } = &parsed_program.forms[1].node {
+    if let TopLevelKind::VarDef { name, value } = &parsed_program.forms[1].node {
         assert_eq!(name, "math");
-        assert_eq!(path, "math");
-        assert!(!is_header);
+        if let ExprKind::Call { name: call_name, args } = &value.node {
+            assert_eq!(call_name, "use");
+            assert_eq!(args.len(), 1);
+            if let ExprKind::Literal(Literal::String(path)) = &args[0].node {
+                assert_eq!(path, "math");
+            } else {
+                panic!("Expected argument to be a string path");
+            }
+        } else {
+            panic!("Expected value to be a Call to 'use'");
+        }
     } else {
-        panic!("Expected second form to be a ModuleImport");
+        panic!("Expected second form to be a VarDef");
     }
     
     // Test type inference - just verify it doesn't fail

@@ -1,5 +1,6 @@
 ;; Higher-order functions example for LLLisp
-(cImport "stdio.h")
+(def stdio (use :header "stdio.h"))
+(alias printf stdio/printf)
 
 ;; Define a function that applies a function twice
 (def applyTwice (fn [(:f (fn [(i32)] i32)) (:x i32)] i32

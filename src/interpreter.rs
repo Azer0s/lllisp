@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::ast::{ExprKind, Literal, Located, Program, TopLevel, TopLevelKind, Type, BinaryOp, Span};
+use crate::ast::{ExprKind, Literal, Located, Program, TopLevel, TopLevelKind, Span};
 
 /// Represents a runtime value in the interpreter
 #[derive(Debug, Clone, PartialEq)]
@@ -17,6 +17,7 @@ pub enum Value {
     // For storing unevaluated expressions in macro expansion
     Expression(Box<Located<ExprKind>>),
     List(Vec<Value>),
+    NativeFunction(String, usize),
 }
 
 impl Value {
@@ -87,7 +88,7 @@ impl PartialEq for Function {
 #[derive(Debug, Clone)]
 pub struct Macro {
     pub params: Vec<String>,
-    pub body: Box<Located<ExprKind>>,
+    pub body: Located<ExprKind>,
 }
 
 impl PartialEq for Macro {
@@ -164,8 +165,29 @@ impl Interpreter {
         // Add OS detection
         env.define("os".to_string(), Value::Atom(std::env::consts::OS.to_string()));
         
-        // Add basic arithmetic functions
-        // These will be implemented as native functions
+        // Add basic arithmetic operators as functions
+        env.define("+".to_string(), Value::NativeFunction("+".to_string(), 2));
+        env.define("-".to_string(), Value::NativeFunction("-".to_string(), 2));
+        env.define("*".to_string(), Value::NativeFunction("*".to_string(), 2));
+        env.define("/".to_string(), Value::NativeFunction("/".to_string(), 2));
+        env.define("%".to_string(), Value::NativeFunction("%".to_string(), 2));
+        
+        // Add comparison operators as functions
+        env.define("==".to_string(), Value::NativeFunction("==".to_string(), 2));
+        env.define("!=".to_string(), Value::NativeFunction("!=".to_string(), 2));
+        env.define("<".to_string(), Value::NativeFunction("<".to_string(), 2));
+        env.define(">".to_string(), Value::NativeFunction(">".to_string(), 2));
+        env.define("<=".to_string(), Value::NativeFunction("<=".to_string(), 2));
+        env.define(">=".to_string(), Value::NativeFunction(">=".to_string(), 2));
+        
+        // Add logical operators as functions
+        env.define("and".to_string(), Value::NativeFunction("and".to_string(), 2));
+        env.define("or".to_string(), Value::NativeFunction("or".to_string(), 2));
+        env.define("not".to_string(), Value::NativeFunction("not".to_string(), 1));
+        
+        // Add special forms
+        env.define("fn".to_string(), Value::NativeFunction("fn".to_string(), usize::MAX)); // Variable args
+        env.define("os/when".to_string(), Value::NativeFunction("os/when".to_string(), 2));
     }
 
     pub fn eval_program(&mut self, program: &Program) -> Result<Value, String> {
@@ -184,27 +206,50 @@ impl Interpreter {
                 let val = self.eval_expr(value)?;
                 self.env.define(name.clone(), val.clone());
                 Ok(val)
-            }
-            TopLevelKind::TypeDef { .. } => {
-                // Types are not evaluated at runtime in this simple interpreter
-                Ok(Value::Null)
-            }
-            TopLevelKind::ModuleImport { .. } => {
-                // Module imports are not handled in this simple interpreter
-                Ok(Value::Null)
-            }
+            },
+            TopLevelKind::TypeDef { name, ty } => {
+                // Register the type name in the environment
+                // For the interpreter, we just need to know it's a type
+                self.env.define(name.clone(), Value::Expression(Box::new(Located::new(
+                    ExprKind::Symbol("type".to_string()),
+                    form.span,
+                ))));
+                Ok(Value::Expression(Box::new(Located::new(
+                    ExprKind::Symbol(name.clone()),
+                    form.span,
+                ))))
+            },
+            TopLevelKind::ModuleImport { name, path, is_header } => {
+                // In the interpreter, we'll just register the module as a special value
+                // In a real implementation, we'd load the module's interface
+                let module_value = Value::Expression(Box::new(Located::new(
+                    ExprKind::Symbol(format!("module:{}:{}", if *is_header { "header" } else { "normal" }, path)),
+                    form.span,
+                )));
+                self.env.define(name.clone(), module_value.clone());
+                Ok(module_value)
+            },
             TopLevelKind::Expr(expr) => {
                 self.eval_expr_kind(expr, &self.env)
-            }
+            },
             TopLevelKind::MacroDef { name, params, body } => {
-                // Define a macro
+                // Create a macro value and store it in the environment
                 let macro_val = Value::Macro(Macro {
                     params: params.clone(),
-                    body: Box::new(body.clone()),
+                    body: body.clone(),
                 });
                 self.env.define(name.clone(), macro_val.clone());
                 Ok(macro_val)
-            }
+            },
+            TopLevelKind::Alias { name, module, function } => {
+                // In the interpreter, we'll register the alias as a special value
+                let alias_value = Value::Expression(Box::new(Located::new(
+                    ExprKind::Symbol(format!("alias:{}:{}", module, function)),
+                    form.span,
+                )));
+                self.env.define(name.clone(), alias_value.clone());
+                Ok(alias_value)
+            },
         }
     }
 
@@ -225,11 +270,6 @@ impl Interpreter {
                 } else {
                     self.eval_function_call(name, args, env)
                 }
-            }
-            ExprKind::Binary { op, left, right } => {
-                let left_val = self.eval_expr_kind(&left.node, env)?;
-                let right_val = self.eval_expr_kind(&right.node, env)?;
-                self.eval_binary_op(*op, left_val, right_val)
             }
             ExprKind::If { condition, then_branch, else_branch } => {
                 let cond_val = self.eval_expr_kind(&condition.node, env)?;
@@ -300,24 +340,45 @@ impl Interpreter {
     }
 
     fn eval_function_call(&self, name: &str, args: &[Located<ExprKind>], env: &Environment) -> Result<Value, String> {
-        // Handle special forms first
-        match name {
-            "fn" => self.eval_fn_form(args, env),
-            "os/when" => self.eval_os_when(args, env),
-            _ => {
-                // Regular function call
-                // Evaluate all arguments
-                let mut arg_values = Vec::new();
-                for arg in args {
-                    arg_values.push(self.eval_expr_kind(&arg.node, env)?);
+        // Get the function
+        let func = env.get(name).ok_or_else(|| format!("Undefined function: {}", name))?;
+        
+        // Evaluate the arguments
+        let mut evaluated_args = Vec::new();
+        for arg in args {
+            let arg_value = self.eval_expr_kind(&arg.node, env)?;
+            evaluated_args.push(arg_value);
+        }
+        
+        // Call the function
+        match func {
+            Value::Function(func) => {
+                if func.params.len() != args.len() {
+                    return Err(format!("Expected {} arguments, got {}", func.params.len(), args.len()));
                 }
-
-                // Look up the function in the environment
-                match env.get(name) {
-                    Some(Value::Function(func)) => self.apply_function(&func, &arg_values),
-                    _ => Err(format!("Undefined function: {}", name)),
+                
+                // Create a new environment for the function call
+                let mut call_env = Environment::with_parent(func.env.clone());
+                
+                // Bind the arguments to parameters
+                for (param, arg) in func.params.iter().zip(evaluated_args.iter()) {
+                    call_env.define(param.clone(), arg.clone());
                 }
-            }
+                
+                // Evaluate the body in the new environment
+                self.eval_expr_kind(&func.body.node, &call_env)
+            },
+            Value::NativeFunction(name, expected_args) => {
+                // For native functions like +, -, *, /, etc.
+                if expected_args != usize::MAX && evaluated_args.len() != expected_args {
+                    return Err(format!("Expected {} arguments for native function {}, got {}", 
+                                      expected_args, name, evaluated_args.len()));
+                }
+                
+                // Call the native function implementation
+                self.eval_native_function(&name, &evaluated_args)
+            },
+            _ => Err(format!("{} is not a function", name)),
         }
     }
 
@@ -370,27 +431,6 @@ impl Interpreter {
             // Skip the body
             Ok(Value::Null)
         }
-    }
-
-    fn apply_function(&self, func: &Function, args: &[Value]) -> Result<Value, String> {
-        if args.len() != func.params.len() {
-            return Err(format!(
-                "Function expected {} arguments, got {}",
-                func.params.len(),
-                args.len()
-            ));
-        }
-
-        // Create a new environment with the function's environment as parent
-        let mut call_env = Environment::with_parent(func.env.clone());
-
-        // Bind arguments to parameters
-        for (param, arg) in func.params.iter().zip(args.iter()) {
-            call_env.define(param.clone(), arg.clone());
-        }
-
-        // Evaluate the body in the new environment
-        self.eval_expr_kind(&func.body.node, &call_env)
     }
 
     fn eval_macro_call(&self, macro_def: &Macro, args: &[Located<ExprKind>], env: &Environment) -> Result<Value, String> {
@@ -476,72 +516,300 @@ impl Interpreter {
         }
     }
 
-    fn eval_binary_op(&self, op: BinaryOp, left: Value, right: Value) -> Result<Value, String> {
-        match op {
-            BinaryOp::Add => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a + b)),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
-                _ => Err(format!("Cannot add {:?} and {:?}", left, right)),
+    fn eval_native_function(&self, name: &str, args: &[Value]) -> Result<Value, String> {
+        match name {
+            "+" => {
+                if args.len() != 2 {
+                    return Err(format!("Expected 2 arguments for +, got {}", args.len()));
+                }
+                
+                // Addition operation
+                match (&args[0], &args[1]) {
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        Ok(Value::Integer(a + b))
+                    },
+                    (Value::Float(a), Value::Float(b)) => {
+                        Ok(Value::Float(a + b))
+                    },
+                    (Value::Integer(a), Value::Float(b)) => {
+                        Ok(Value::Float(*a as f64 + b))
+                    },
+                    (Value::Float(a), Value::Integer(b)) => {
+                        Ok(Value::Float(a + *b as f64))
+                    },
+                    _ => Err(format!("Unsupported operand types for +: {:?} and {:?}", args[0], args[1])),
+                }
             },
-            BinaryOp::Sub => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a - b)),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
-                _ => Err(format!("Cannot subtract {:?} and {:?}", left, right)),
+            "*" => {
+                if args.len() != 2 {
+                    return Err(format!("Expected 2 arguments for *, got {}", args.len()));
+                }
+                
+                // Multiplication operation
+                match (&args[0], &args[1]) {
+                    (Value::Integer(a), Value::Integer(b)) => {
+                        Ok(Value::Integer(a * b))
+                    },
+                    (Value::Float(a), Value::Float(b)) => {
+                        Ok(Value::Float(a * b))
+                    },
+                    (Value::Integer(a), Value::Float(b)) => {
+                        Ok(Value::Float(*a as f64 * b))
+                    },
+                    (Value::Float(a), Value::Integer(b)) => {
+                        Ok(Value::Float(a * *b as f64))
+                    },
+                    _ => Err(format!("Unsupported operand types for *: {:?} and {:?}", args[0], args[1])),
+                }
             },
-            BinaryOp::Mul => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a * b)),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
-                _ => Err(format!("Cannot multiply {:?} and {:?}", left, right)),
-            },
-            BinaryOp::Div => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => {
-                    if *b == 0 {
-                        Err("Division by zero".to_string())
-                    } else {
-                        Ok(Value::Integer(a / b))
-                    }
-                },
-                (Value::Float(a), Value::Float(b)) => {
-                    if *b == 0.0 {
-                        Err("Division by zero".to_string())
-                    } else {
-                        Ok(Value::Float(a / b))
-                    }
-                },
-                _ => Err(format!("Cannot divide {:?} and {:?}", left, right)),
-            },
-            BinaryOp::Eq => Ok(Value::Boolean(left == right)),
-            BinaryOp::Ne => Ok(Value::Boolean(left != right)),
-            BinaryOp::Lt => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a < b)),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a < b)),
-                _ => Err(format!("Cannot compare {:?} and {:?}", left, right)),
-            },
-            BinaryOp::Gt => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a > b)),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a > b)),
-                _ => Err(format!("Cannot compare {:?} and {:?}", left, right)),
-            },
-            BinaryOp::Le => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a <= b)),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a <= b)),
-                _ => Err(format!("Cannot compare {:?} and {:?}", left, right)),
-            },
-            BinaryOp::Ge => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Boolean(a >= b)),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a >= b)),
-                _ => Err(format!("Cannot compare {:?} and {:?}", left, right)),
-            },
-            BinaryOp::Mod => match (&left, &right) {
-                (Value::Integer(a), Value::Integer(b)) => {
-                    if *b == 0 {
-                        Err("Modulo by zero".to_string())
-                    } else {
-                        Ok(Value::Integer(a % b))
-                    }
-                },
-                _ => Err(format!("Cannot perform modulo on {:?} and {:?}", left, right)),
-            },
+            // Other native functions can be added here
+            _ => Err(format!("Unknown native function: {}", name)),
         }
+    }
+
+    /// Define a macro in the environment
+    pub fn define_macro(&mut self, name: &str, params: Vec<String>, body: Located<ExprKind>) {
+        self.env.define(name.to_string(), Value::Macro(Macro {
+            params,
+            body,
+        }));
+    }
+
+    /// Apply a macro to arguments without evaluating the result
+    pub fn macro_substitution(&self, macro_name: &str, args: &[Located<ExprKind>]) -> Result<Located<ExprKind>, String> {
+        // Get the macro definition
+        let macro_def = match self.env.get(macro_name) {
+            Some(Value::Macro(m)) => m,
+            _ => return Err(format!("Macro '{}' not found", macro_name)),
+        };
+
+        println!("Applying macro substitution for '{}' with {} parameters to {} arguments", 
+                 macro_name, macro_def.params.len(), args.len());
+
+        // Create a new environment for macro expansion
+        let mut macro_env = Environment::new();
+
+        // Bind arguments to parameters without evaluating them
+        let mut param_index = 0;
+        let mut arg_index = 0;
+
+        while param_index < macro_def.params.len() {
+            let param_name = &macro_def.params[param_index];
+            
+            // Check for rest parameter (indicated by '&')
+            if param_name == "&" && param_index < macro_def.params.len() - 1 {
+                println!("Found rest parameter");
+                // Next parameter is the name for the rest arguments
+                param_index += 1;
+                let rest_param = &macro_def.params[param_index];
+                
+                // Collect all remaining arguments into a list
+                let rest_args: Vec<Value> = args[arg_index..].iter()
+                    .map(|arg| Value::Expression(Box::new(arg.clone())))
+                    .collect();
+                
+                println!("Binding {} rest arguments to parameter '{}'", rest_args.len(), rest_param);
+                macro_env.define(rest_param.clone(), Value::List(rest_args));
+                
+                // We've consumed all remaining arguments
+                param_index += 1;  // Move to the next parameter after the rest param
+                break;             // Exit the loop as we've processed all arguments
+            } else if arg_index < args.len() {
+                // Regular parameter with a corresponding argument
+                println!("Binding argument to parameter '{}'", param_name);
+                macro_env.define(param_name.clone(), Value::Expression(Box::new(args[arg_index].clone())));
+                param_index += 1;
+                arg_index += 1;
+            } else {
+                // We ran out of arguments
+                return Err(format!("Not enough arguments for macro '{}': expected at least {}, got {}",
+                                  macro_name, macro_def.params.len(), args.len()));
+            }
+        }
+
+        // Create a temporary interpreter with the macro environment
+        let mut temp_interpreter = Self::new();
+        temp_interpreter.env = macro_env;
+
+        // Use macro substitution instead of evaluation to replace symbols
+        let substituted = self.substitute_macro_body(&macro_def.body, &temp_interpreter.env)?;
+        
+        println!("Substituted macro expression: {:?}", substituted.node);
+        Ok(substituted)
+    }
+
+    /// Substitute symbols in a macro body with their values from the environment
+    fn substitute_macro_body(&self, expr: &Located<ExprKind>, env: &Environment) -> Result<Located<ExprKind>, String> {
+        match &expr.node {
+            ExprKind::Symbol(name) => {
+                // If this is a parameter, replace it with the argument
+                if let Some(value) = env.get(name) {
+                    match value {
+                        Value::Expression(boxed_expr) => {
+                            // Return the expression directly without evaluating
+                            Ok(*boxed_expr.clone())
+                        },
+                        Value::List(items) => {
+                            // Handle rest parameters by converting list to tuple
+                            println!("Converting list parameter '{}' to tuple with {} items", name, items.len());
+                            
+                            // Extract expressions from the list
+                            let mut list_exprs = Vec::new();
+                            for item in items {
+                                match item {
+                                    Value::Expression(expr) => {
+                                        list_exprs.push(*expr.clone());
+                                    },
+                                    _ => {
+                                        let expr = item.to_expr()?;
+                                        list_exprs.push(expr);
+                                    }
+                                }
+                            }
+                            
+                            // Create a tuple expression with all arguments
+                            Ok(Located::new(
+                                ExprKind::Literal(Literal::Tuple(list_exprs)),
+                                Span::new(0, 0)
+                            ))
+                        },
+                        _ => {
+                            // For non-expression values, convert to an expression
+                            value.to_expr()
+                        }
+                    }
+                } else {
+                    // Not a parameter, keep it as a symbol
+                    Ok(expr.clone())
+                }
+            },
+            ExprKind::Call { name, args } => {
+                // Recursively substitute in the arguments
+                let mut substituted_args = Vec::new();
+                for arg in args {
+                    let substituted_arg = self.substitute_macro_body(arg, env)?;
+                    substituted_args.push(substituted_arg);
+                }
+                
+                // Return a new call expression with substituted arguments
+                Ok(Located::new(
+                    ExprKind::Call {
+                        name: name.clone(),
+                        args: substituted_args,
+                    },
+                    expr.span.clone()
+                ))
+            },
+            ExprKind::Literal(lit) => {
+                match lit {
+                    Literal::Tuple(elements) => {
+                        // Recursively substitute in tuple elements
+                        let mut substituted_elements = Vec::new();
+                        for elem in elements {
+                            let substituted_elem = self.substitute_macro_body(elem, env)?;
+                            substituted_elements.push(substituted_elem);
+                        }
+                        
+                        Ok(Located::new(
+                            ExprKind::Literal(Literal::Tuple(substituted_elements)),
+                            expr.span.clone()
+                        ))
+                    },
+                    _ => Ok(expr.clone()),
+                }
+            },
+            // Other expression types can be added here as needed
+            // For now, we'll just return most other expressions unchanged
+            _ => Ok(expr.clone()),
+        }
+    }
+
+    /// Evaluate a function expression with the given arguments
+    pub fn eval_function(&self, fn_expr: &Located<ExprKind>, args: &[Located<ExprKind>]) -> Result<Value, String> {
+        // Evaluate the function expression to get a function value
+        match &fn_expr.node {
+            ExprKind::Call { name, args: fn_args } if name == "fn" => {
+                // Extract parameter names
+                if fn_args.len() < 3 {
+                    return Err("Function definition requires parameters, return type, and body".to_string());
+                }
+                
+                let param_names = if let ExprKind::Literal(Literal::Tuple(param_exprs)) = &fn_args[0].node {
+                    let mut names = Vec::new();
+                    for param_expr in param_exprs {
+                        if let ExprKind::Symbol(param_name) = &param_expr.node {
+                            names.push(param_name.clone());
+                        } else {
+                            return Err(format!("Invalid parameter in function definition: {:?}", param_expr.node));
+                        }
+                    }
+                    names
+                } else {
+                    return Err(format!("Invalid parameters list in function definition: {:?}", fn_args[0].node));
+                };
+                
+                // The body is the third argument (index 2)
+                let body = &fn_args[2];
+                
+                // Check if we have the correct number of args
+                if param_names.len() != args.len() {
+                    return Err(format!("Expected {} arguments, got {}", param_names.len(), args.len()));
+                }
+                
+                // Create a new environment for the function execution
+                let mut call_env = Environment::with_parent(self.env.clone());
+                
+                // Bind the provided arguments to the parameter names
+                for (param, arg) in param_names.iter().zip(args.iter()) {
+                    let arg_value = self.eval_expr_kind(&arg.node, &self.env)?;
+                    call_env.define(param.clone(), arg_value);
+                }
+                
+                // Evaluate the body in the new environment
+                self.eval_expr_kind(&body.node, &call_env)
+            },
+            _ => Err(format!("Expected function expression, got: {:?}", fn_expr.node)),
+        }
+    }
+
+    /// Add a native function to the interpreter
+    pub fn add_native_function(&mut self, name: &str, arg_count: usize) {
+        self.env.define(name.to_string(), Value::NativeFunction(name.to_string(), arg_count));
+    }
+
+    /// Apply a macro to arguments and evaluate the result
+    pub fn apply_macro(&mut self, macro_name: &str, args: &[Located<ExprKind>]) -> Result<Located<ExprKind>, String> {
+        // First do the substitution
+        let substituted = self.macro_substitution(macro_name, args)?;
+        
+        // Then evaluate the result
+        let expanded_value = self.eval_expr(&substituted)?;
+        
+        // Convert the result back to an expression
+        match expanded_value {
+            Value::Expression(expr) => Ok(*expr),
+            Value::List(values) => {
+                println!("Converting list to tuple expression");
+                // Convert list to a tuple expression
+                let exprs: Result<Vec<Located<ExprKind>>, String> = values.iter()
+                    .map(|v| v.to_expr())
+                    .collect();
+                
+                let tuple_exprs = exprs?;
+                Ok(Located::new(
+                    ExprKind::Literal(Literal::Tuple(tuple_exprs)),
+                    Span::new(0, 0) // Use a dummy span
+                ))
+            },
+            other => {
+                // For other values, convert to expressions
+                other.to_expr()
+            }
+        }
+    }
+
+    /// Get a variable value by name
+    pub fn get_var(&self, name: &str) -> Option<Value> {
+        self.env.get(name).map(|v| v.clone())
     }
 } 

@@ -152,11 +152,12 @@ fn test_condition_for_loop() {
             // Check iterator is a condition iterator
             if let Some(iter) = iterator {
                 if let ForIterator::Condition(condition) = &**iter {
-                    // Check condition is a binary operation
-                    if let ExprKind::Binary { op, .. } = &condition.node {
-                        assert_eq!(format!("{:?}", op), "Lt");
+                    // Check condition is a function call to "<"
+                    if let ExprKind::Call { name, args } = &condition.node {
+                        assert_eq!(name, "<");
+                        assert_eq!(args.len(), 2);
                     } else {
-                        panic!("Expected Binary operation in condition, got {:?}", condition.node);
+                        panic!("Expected function call to '<' in condition, got {:?}", condition.node);
                     }
                 } else {
                     panic!("Expected Condition iterator, got {:?}", iter);

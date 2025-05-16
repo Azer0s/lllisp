@@ -9,7 +9,7 @@
 /// 5. Makes implicit returns explicit by adding Return nodes
 
 use std::collections::{HashMap, HashSet};
-use crate::ast::{Program, TopLevel, TopLevelKind, Type, Expr, ExprKind, Located, Span};
+use crate::ast::{Program, TopLevel, TopLevelKind, Type, Expr, ExprKind, Located, Span, Literal};
 
 /// Represents a monomorphized type with a unique name
 #[derive(Debug, Clone)]
@@ -49,6 +49,8 @@ pub struct CompilerPass1 {
     monomorphized_types: HashMap<String, MonomorphizedType>,
     /// Map of mangled names to monomorphized function instances
     monomorphized_functions: HashMap<String, MonomorphizedFunction>,
+    /// Map of constant names to their values for constant folding
+    constants: HashMap<String, Expr>,
 }
 
 impl CompilerPass1 {
@@ -60,6 +62,7 @@ impl CompilerPass1 {
             concrete_type_instances: HashSet::new(),
             monomorphized_types: HashMap::new(),
             monomorphized_functions: HashMap::new(),
+            constants: HashMap::new(),
         }
     }
 
@@ -121,196 +124,8 @@ impl CompilerPass1 {
     }
     
     /// Process an expression to add explicit returns where needed
-    fn process_expr(&mut self, expr: &Expr) -> Expr {
-        let processed_node = match &expr.node {
-            ExprKind::Do(exprs) => {
-                // Process a block of expressions
-                self.process_block(exprs, expr.span)
-            },
-            ExprKind::If { condition, then_branch, else_branch } => {
-                // Process conditional expressions
-                let processed_condition = self.process_expr(condition);
-                let processed_then = self.process_expr(then_branch);
-                
-                // Wrap then branch in a Return if it's not already a Return
-                let wrapped_then = match &processed_then.node {
-                    ExprKind::Return(_) => processed_then,
-                    _ => Located::new(
-                        ExprKind::Return(Box::new(processed_then)),
-                        then_branch.span,
-                    ),
-                };
-                
-                let processed_else = if let Some(else_expr) = else_branch {
-                    let processed_else_expr = self.process_expr(else_expr);
-                    
-                    // Wrap else branch in a Return if it's not already a Return
-                    let wrapped_else = match &processed_else_expr.node {
-                        ExprKind::Return(_) => processed_else_expr,
-                        _ => Located::new(
-                            ExprKind::Return(Box::new(processed_else_expr)),
-                            else_expr.span,
-                        ),
-                    };
-                    
-                    Some(Box::new(wrapped_else))
-                } else {
-                    None
-                };
-                
-                ExprKind::If {
-                    condition: Box::new(processed_condition),
-                    then_branch: Box::new(wrapped_then),
-                    else_branch: processed_else,
-                }
-            },
-            ExprKind::Match { scrutinee, cases } => {
-                // Process match expressions
-                let processed_scrutinee = self.process_expr(scrutinee);
-                let processed_cases = cases.iter()
-                    .map(|case| {
-                        let processed_result = self.process_expr(&case.result);
-                        crate::ast::MatchCase {
-                            pattern: case.pattern.clone(),
-                            result: processed_result,
-                        }
-                    })
-                    .collect();
-                
-                ExprKind::Match {
-                    scrutinee: Box::new(processed_scrutinee),
-                    cases: processed_cases,
-                }
-            },
-            ExprKind::For { iterator, body } => {
-                // Process for loop expressions
-                let processed_body = self.process_expr(body);
-                
-                ExprKind::For {
-                    iterator: iterator.clone(),
-                    body: Box::new(processed_body),
-                }
-            },
-            ExprKind::Binary { op, left, right } => {
-                // Process binary operations
-                let processed_left = self.process_expr(left);
-                let processed_right = self.process_expr(right);
-                
-                ExprKind::Binary {
-                    op: op.clone(),
-                    left: Box::new(processed_left),
-                    right: Box::new(processed_right),
-                }
-            },
-            ExprKind::Call { name, args } => {
-                // Process function calls
-                let processed_args = args.iter()
-                    .map(|arg| self.process_expr(arg))
-                    .collect();
-                
-                ExprKind::Call {
-                    name: name.clone(),
-                    args: processed_args,
-                }
-            },
-            ExprKind::ModuleCall { module, function, args } => {
-                // Process module function calls
-                let processed_args = args.iter()
-                    .map(|arg| self.process_expr(arg))
-                    .collect();
-                
-                ExprKind::ModuleCall {
-                    module: module.clone(),
-                    function: function.clone(),
-                    args: processed_args,
-                }
-            },
-            ExprKind::FieldAccess { object, field } => {
-                // Process field access
-                let processed_object = self.process_expr(object);
-                
-                ExprKind::FieldAccess {
-                    object: Box::new(processed_object),
-                    field: field.clone(),
-                }
-            },
-            ExprKind::SetField { object, field, value } => {
-                // Process field setting
-                let processed_object = self.process_expr(object);
-                let processed_value = self.process_expr(value);
-                
-                ExprKind::SetField {
-                    object: Box::new(processed_object),
-                    field: field.clone(),
-                    value: Box::new(processed_value),
-                }
-            },
-            ExprKind::SetIndex { array, index, value } => {
-                // Process index setting
-                let processed_array = self.process_expr(array);
-                let processed_index = self.process_expr(index);
-                let processed_value = self.process_expr(value);
-                
-                ExprKind::SetIndex {
-                    array: Box::new(processed_array),
-                    index: Box::new(processed_index),
-                    value: Box::new(processed_value),
-                }
-            },
-            ExprKind::Store { addr, value } => {
-                // Process store operations
-                let processed_addr = self.process_expr(addr);
-                let processed_value = self.process_expr(value);
-                
-                ExprKind::Store {
-                    addr: Box::new(processed_addr),
-                    value: Box::new(processed_value),
-                }
-            },
-            ExprKind::Load(ptr) => {
-                // Process load operations
-                let processed_ptr = self.process_expr(ptr);
-                
-                ExprKind::Load(Box::new(processed_ptr))
-            },
-            ExprKind::Addr(val) => {
-                // Process address-of operations
-                let processed_val = self.process_expr(val);
-                
-                ExprKind::Addr(Box::new(processed_val))
-            },
-            ExprKind::DataConstructor { tag, value } => {
-                // Process data constructors
-                let processed_value = if let Some(val) = value {
-                    Some(Box::new(self.process_expr(val)))
-                } else {
-                    None
-                };
-                
-                ExprKind::DataConstructor {
-                    tag: tag.clone(),
-                    value: processed_value,
-                }
-            },
-            ExprKind::TypeCheck { value, check_type } => {
-                // Process type checks
-                let processed_value = self.process_expr(value);
-                
-                ExprKind::TypeCheck {
-                    value: Box::new(processed_value),
-                    check_type: check_type.clone(),
-                }
-            },
-            // Return nodes are already explicit, so just clone them
-            ExprKind::Return(val) => {
-                let processed_val = self.process_expr(val);
-                ExprKind::Return(Box::new(processed_val))
-            },
-            // Literals and symbols don't need processing
-            _ => expr.node.clone(),
-        };
-        
-        // Create a new expression with the processed node
+    fn process_expr(&self, expr: &Expr) -> Expr {
+        let processed_node = self.process_expr_kind(&expr.node);
         Located::new(processed_node, expr.span)
     }
     
@@ -437,10 +252,6 @@ impl CompilerPass1 {
                 for arg in args {
                     self.find_generic_instances_in_expr(arg);
                 }
-            },
-            ExprKind::Binary { left, right, .. } => {
-                self.find_generic_instances_in_expr(left);
-                self.find_generic_instances_in_expr(right);
             },
             ExprKind::If { condition, then_branch, else_branch } => {
                 self.find_generic_instances_in_expr(condition);
@@ -697,6 +508,226 @@ impl CompilerPass1 {
                 Type::Union(new_types)
             },
             _ => ty.clone(),
+        }
+    }
+
+    fn process_expr_kind(&self, expr_kind: &ExprKind) -> ExprKind {
+        match expr_kind {
+            ExprKind::Literal(_) => expr_kind.clone(),
+            ExprKind::Symbol(name) => {
+                if let Some(value) = self.constants.get(name) {
+                    value.node.clone()
+                } else {
+                    expr_kind.clone()
+                }
+            },
+            ExprKind::Call { name, args } => {
+                // Process arguments
+                let processed_args = args.iter()
+                    .map(|arg| self.process_expr(arg))
+                    .collect();
+                
+                ExprKind::Call {
+                    name: name.clone(),
+                    args: processed_args,
+                }
+            },
+            ExprKind::ModuleCall { module, function, args } => {
+                // Process arguments
+                let processed_args = args.iter()
+                    .map(|arg| self.process_expr(arg))
+                    .collect();
+                
+                ExprKind::ModuleCall {
+                    module: module.clone(),
+                    function: function.clone(),
+                    args: processed_args,
+                }
+            },
+            ExprKind::Do(exprs) => {
+                // Process all expressions in the block
+                let processed_exprs = exprs.iter()
+                    .map(|expr| self.process_expr(expr))
+                    .collect();
+                
+                ExprKind::Do(processed_exprs)
+            },
+            ExprKind::Return(expr) => {
+                // Process the returned expression
+                let processed_expr = self.process_expr(expr);
+                
+                ExprKind::Return(Box::new(processed_expr))
+            },
+            ExprKind::If { condition, then_branch, else_branch } => {
+                // Process condition and branches
+                let processed_condition = self.process_expr(condition);
+                let processed_then = self.process_expr(then_branch);
+                let processed_else = else_branch.as_ref()
+                    .map(|e| Box::new(self.process_expr(e)));
+                
+                ExprKind::If {
+                    condition: Box::new(processed_condition),
+                    then_branch: Box::new(processed_then),
+                    else_branch: processed_else,
+                }
+            },
+            ExprKind::For { iterator, body } => {
+                // Process the iterator if present
+                let processed_iterator = iterator.as_ref().map(|it| {
+                    Box::new(match &**it {
+                        crate::ast::ForIterator::Condition(cond) => {
+                            crate::ast::ForIterator::Condition(self.process_expr(cond))
+                        },
+                        crate::ast::ForIterator::Range { var, collection } => {
+                            crate::ast::ForIterator::Range {
+                                var: var.clone(),
+                                collection: self.process_expr(collection),
+                            }
+                        },
+                    })
+                });
+                
+                // Process the body
+                let processed_body = self.process_expr(body);
+                
+                ExprKind::For {
+                    iterator: processed_iterator,
+                    body: Box::new(processed_body),
+                }
+            },
+            ExprKind::Match { scrutinee, cases } => {
+                // Process the scrutinee
+                let processed_scrutinee = self.process_expr(scrutinee);
+                
+                // Process each case result
+                let processed_cases = cases.iter().map(|case| {
+                    crate::ast::MatchCase {
+                        pattern: case.pattern.clone(), // Patterns don't need processing
+                        result: self.process_expr(&case.result),
+                    }
+                }).collect();
+                
+                ExprKind::Match {
+                    scrutinee: Box::new(processed_scrutinee),
+                    cases: processed_cases,
+                }
+            },
+            ExprKind::Addr(expr) => {
+                // Process the expr
+                let processed_expr = self.process_expr(expr);
+                
+                ExprKind::Addr(Box::new(processed_expr))
+            },
+            ExprKind::Load(expr) => {
+                // Process the expr
+                let processed_expr = self.process_expr(expr);
+                
+                ExprKind::Load(Box::new(processed_expr))
+            },
+            ExprKind::Store { addr, value } => {
+                // Process addr and value
+                let processed_addr = self.process_expr(addr);
+                let processed_value = self.process_expr(value);
+                
+                ExprKind::Store {
+                    addr: Box::new(processed_addr),
+                    value: Box::new(processed_value),
+                }
+            },
+            ExprKind::FieldAccess { object, field } => {
+                // Process the object
+                let processed_object = self.process_expr(object);
+                
+                ExprKind::FieldAccess {
+                    object: Box::new(processed_object),
+                    field: field.clone(),
+                }
+            },
+            ExprKind::SetField { object, field, value } => {
+                // Process object and value
+                let processed_object = self.process_expr(object);
+                let processed_value = self.process_expr(value);
+                
+                ExprKind::SetField {
+                    object: Box::new(processed_object),
+                    field: field.clone(),
+                    value: Box::new(processed_value),
+                }
+            },
+            ExprKind::SetIndex { array, index, value } => {
+                // Process array, index, and value
+                let processed_array = self.process_expr(array);
+                let processed_index = self.process_expr(index);
+                let processed_value = self.process_expr(value);
+                
+                ExprKind::SetIndex {
+                    array: Box::new(processed_array),
+                    index: Box::new(processed_index),
+                    value: Box::new(processed_value),
+                }
+            },
+            ExprKind::SetAddr { addr, value } => {
+                // Process addr and value
+                let processed_addr = self.process_expr(addr);
+                let processed_value = self.process_expr(value);
+                
+                ExprKind::SetAddr {
+                    addr: Box::new(processed_addr),
+                    value: Box::new(processed_value),
+                }
+            },
+            ExprKind::DataConstructor { tag, value } => {
+                // Process the value if present
+                let processed_value = value.as_ref()
+                    .map(|v| Box::new(self.process_expr(v)));
+                
+                ExprKind::DataConstructor {
+                    tag: tag.clone(),
+                    value: processed_value,
+                }
+            },
+            ExprKind::TypeCheck { value, check_type } => {
+                // Process the value
+                let processed_value = self.process_expr(value);
+                
+                ExprKind::TypeCheck {
+                    value: Box::new(processed_value),
+                    check_type: check_type.clone(),
+                }
+            },
+            ExprKind::Quote(expr) => {
+                // We don't process quoted expressions
+                ExprKind::Quote(expr.clone())
+            },
+            ExprKind::Unquote(expr) => {
+                // We don't process unquoted expressions
+                ExprKind::Unquote(expr.clone())
+            },
+            &ExprKind::UnquoteSplicing(_) => {
+                // We don't process unquote-splicing expressions
+                ExprKind::UnquoteSplicing(Box::new(Located::new(
+                    ExprKind::Symbol("...".to_string()),
+                    Span::new(0, 0)
+                )))
+            },
+            &ExprKind::QuasiQuote(_) => {
+                // We don't process quasi-quoted expressions
+                ExprKind::QuasiQuote(Box::new(Located::new(
+                    ExprKind::Symbol("...".to_string()),
+                    Span::new(0, 0)
+                )))
+            },
+            ExprKind::Binary { op, left, right } => {
+                // Process both operands
+                let processed_left = self.process_expr(left);
+                let processed_right = self.process_expr(right);
+                
+                ExprKind::Binary {
+                    op: *op,
+                    left: Box::new(processed_left),
+                    right: Box::new(processed_right),
+                }
+            },
         }
     }
 } 

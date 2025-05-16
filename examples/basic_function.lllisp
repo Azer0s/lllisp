@@ -1,5 +1,5 @@
 ;; Basic function example for LLLisp
-(cImport "stdio.h")
+(def stdio (use :header "stdio.h"))
 
 ;; Define a function that adds two numbers
 (def add (fn [(:a i32) (:b i32)] i32

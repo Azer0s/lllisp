@@ -1,5 +1,6 @@
 ;; Conditional statements example for LLLisp
-(cImport "stdio.h")
+(def stdio (use :header "stdio.h"))
+(alias printf stdio/printf)
 
 ;; Main function with if-else expressions
 (def main (fn [] i32

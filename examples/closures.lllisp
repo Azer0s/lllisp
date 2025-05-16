@@ -1,5 +1,5 @@
 ;; Closures example for LLLisp
-(cImport "stdio.h")
+(def stdio (use :header "stdio.h"))
 
 ;; Main function demonstrating closures
 (def main (fn [] i32

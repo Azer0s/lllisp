@@ -1,0 +1,96 @@
+;; Macro Examples for LLLisp
+
+;; 1. Simple macro that doubles its argument
+(def double (macro [x] (+ x x)))
+
+;; Using the double macro
+(def a 5)
+(def doubled (double a))  ;; Expands to (+ a a)
+(def doubled-literal (double 10))  ;; Expands to (+ 10 10)
+
+;; 2. Macro with quasiquote/unquote for creating functions
+(def make-adder (macro [n] 
+  `(fn [x] i32 (+ x ~n))))
+
+;; Using the make-adder macro to create specific adder functions
+(def add-five (make-adder 5))     ;; Creates a function that adds 5 to its argument
+(def add-ten (make-adder 10))     ;; Creates a function that adds 10 to its argument
+
+;; 3. Control structure macros
+
+;; when: conditional execution if condition is true (no else branch)
+(def when (macro [condition & body]
+  `(if ~condition (do ~@body) null)))
+
+;; unless: conditional execution if condition is false
+(def unless (macro [condition & body]
+  `(if ~condition null (do ~@body))))
+
+;; Using when and unless
+(def x 10)
+(when (> x 5)
+  (stdio/printf "x is greater than 5\n")
+  (def y (+ x 1)))
+
+(unless (< x 5)
+  (stdio/printf "x is not less than 5\n")
+  (def z (- x 1)))
+
+;; 4. List construction macro with rest args and splicing
+(def list (macro [& items]
+  `[~@items]))
+
+;; Using the list macro
+(def numbers (list 1 2 3 4 5))
+(def mixed (list "hello" 42 :tag [1 2 3]))
+
+;; 5. OS-specific code macro
+(def when-os (macro [os & body]
+  `(if (= (system/os) ~os)
+       (do ~@body)
+       null)))
+
+;; Using when-os
+(when-os "darwin"
+  (stdio/printf "Running on macOS\n")
+  (system/set-feature :macos true))
+
+(when-os "linux"
+  (stdio/printf "Running on Linux\n")
+  (system/set-feature :linux true))
+
+;; 6. Apply macro (for applying a function to a list of arguments)
+(def apply (macro [fn args]
+  `(~fn ~@args)))
+
+;; Using apply
+(def sum-list (apply + [1 2 3 4 5]))  ;; Expands to (+ 1 2 3 4 5)
+
+;; 7. Advanced macro for defining structures with methods
+(def defstruct (macro [name & fields]
+  `(do
+     ;; Define the struct type
+     (type ~name (struct ~@(map (fn [field] `(:~field i32)) fields)))
+     
+     ;; Generate constructor function
+     (def ~(symbol (str "make-" name)) (macro [& values]
+       `(new ~',name ~@values)))
+     
+     ;; Generate getter functions for each field
+     ~@(map (fn [field]
+             `(def ~(symbol (str name "-" field)) (macro [instance]
+                `($ :~',field ~instance)))) 
+           fields))))
+
+;; Using the defstruct macro
+(defstruct point x y)
+
+;; This would expand to define:
+;; 1. A 'point' struct type with fields :x and :y
+;; 2. A 'make-point' constructor
+;; 3. 'point-x' and 'point-y' accessor functions
+
+;; Using the generated macros
+(def p1 (make-point 10 20))
+(def x1 (point-x p1))
+(def y1 (point-y p1)) 

@@ -1,0 +1,9 @@
+;; Simple identity macro
+(def identity (macro [x] x))
+
+;; Simple arithmetic macro
+(def double (macro [x] (+ x x)))
+
+;; Application
+(def result1 (identity 42))
+(def result2 (double 5)) 

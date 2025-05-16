@@ -1,5 +1,6 @@
 ;; Simple test for LLLisp
-(cImport "stdio.h")
+(def stdio (use :header "stdio.h"))
+(alias printf stdio/printf)
 
 ;; Define a simple function
 (def add5 (fn [(:x i32)] i32

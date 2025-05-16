@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{ExprKind, TopLevelKind, Literal, BinaryOp},
+    ast::{ExprKind, TopLevelKind, Literal},
     parser::parse_program,
     type_inference::TypeInferer,
     dead_code_elimination::DeadCodeElimination,

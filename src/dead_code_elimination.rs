@@ -7,7 +7,7 @@
 /// 4. Empty blocks and unnecessary nesting
 
 use std::collections::{HashMap, HashSet};
-use crate::ast::{Program, TopLevel, TopLevelKind, Expr, ExprKind, Located, Span, Literal, BinaryOp};
+use crate::ast::{Program, TopLevel, TopLevelKind, Expr, ExprKind, Located, Span, Literal};
 
 /// Dead code elimination pass
 pub struct DeadCodeElimination {
@@ -130,41 +130,22 @@ impl DeadCodeElimination {
     fn collect_expr_variable_usages_into(&self, expr: &Expr, usages: &mut HashSet<String>) {
         match &expr.node {
             ExprKind::Symbol(name) => {
-                // Variable usage found
                 usages.insert(name.clone());
             },
-            ExprKind::Call { name, args } => {
-                // Function call - the name is used
-                usages.insert(name.clone());
-                
-                // Process arguments
-                for arg in args {
-                    self.collect_expr_variable_usages_into(arg, usages);
-                }
+            ExprKind::Addr(inner) => {
+                self.collect_expr_variable_usages_into(inner, usages);
             },
-            ExprKind::Binary { left, right, .. } => {
-                self.collect_expr_variable_usages_into(left, usages);
-                self.collect_expr_variable_usages_into(right, usages);
+            ExprKind::Load(inner) => {
+                self.collect_expr_variable_usages_into(inner, usages);
             },
-            ExprKind::If { condition, then_branch, else_branch } => {
-                self.collect_expr_variable_usages_into(condition, usages);
-                self.collect_expr_variable_usages_into(then_branch, usages);
-                if let Some(else_expr) = else_branch {
-                    self.collect_expr_variable_usages_into(else_expr, usages);
-                }
+            ExprKind::Store { addr, value } => {
+                self.collect_expr_variable_usages_into(addr, usages);
+                self.collect_expr_variable_usages_into(value, usages);
             },
-            ExprKind::Do(exprs) => {
-                for expr in exprs {
-                    self.collect_expr_variable_usages_into(expr, usages);
-                }
-            },
-            ExprKind::Return(val) => {
-                self.collect_expr_variable_usages_into(val, usages);
-            },
-            ExprKind::FieldAccess { object, .. } => {
+            ExprKind::FieldAccess { object, field: _ } => {
                 self.collect_expr_variable_usages_into(object, usages);
             },
-            ExprKind::SetField { object, value, .. } => {
+            ExprKind::SetField { object, field: _, value } => {
                 self.collect_expr_variable_usages_into(object, usages);
                 self.collect_expr_variable_usages_into(value, usages);
             },
@@ -173,28 +154,40 @@ impl DeadCodeElimination {
                 self.collect_expr_variable_usages_into(index, usages);
                 self.collect_expr_variable_usages_into(value, usages);
             },
-            ExprKind::Store { addr, value } => {
+            ExprKind::SetAddr { addr, value } => {
                 self.collect_expr_variable_usages_into(addr, usages);
                 self.collect_expr_variable_usages_into(value, usages);
             },
-            ExprKind::Load(ptr) => {
-                self.collect_expr_variable_usages_into(ptr, usages);
-            },
-            ExprKind::Addr(val) => {
-                self.collect_expr_variable_usages_into(val, usages);
-            },
-            ExprKind::DataConstructor { value, .. } => {
-                if let Some(val) = value {
-                    self.collect_expr_variable_usages_into(val, usages);
+            ExprKind::DataConstructor { tag: _, value } => {
+                if let Some(inner) = value {
+                    self.collect_expr_variable_usages_into(inner, usages);
                 }
             },
-            ExprKind::TypeCheck { value, .. } => {
-                self.collect_expr_variable_usages_into(value, usages);
+            ExprKind::Call { name, args } => {
+                usages.insert(name.clone());
+                for arg in args {
+                    self.collect_expr_variable_usages_into(arg, usages);
+                }
             },
-            ExprKind::Match { scrutinee, cases } => {
-                self.collect_expr_variable_usages_into(scrutinee, usages);
-                for case in cases {
-                    self.collect_expr_variable_usages_into(&case.result, usages);
+            ExprKind::ModuleCall { module, function: _, args } => {
+                usages.insert(module.clone());
+                for arg in args {
+                    self.collect_expr_variable_usages_into(arg, usages);
+                }
+            },
+            ExprKind::Do(expressions) => {
+                for expr in expressions {
+                    self.collect_expr_variable_usages_into(expr, usages);
+                }
+            },
+            ExprKind::Return(inner) => {
+                self.collect_expr_variable_usages_into(inner, usages);
+            },
+            ExprKind::If { condition, then_branch, else_branch } => {
+                self.collect_expr_variable_usages_into(condition, usages);
+                self.collect_expr_variable_usages_into(then_branch, usages);
+                if let Some(else_expr) = else_branch {
+                    self.collect_expr_variable_usages_into(else_expr, usages);
                 }
             },
             ExprKind::For { iterator, body } => {
@@ -203,19 +196,41 @@ impl DeadCodeElimination {
                         crate::ast::ForIterator::Condition(cond) => {
                             self.collect_expr_variable_usages_into(cond, usages);
                         },
-                        crate::ast::ForIterator::Range { collection, .. } => {
+                        crate::ast::ForIterator::Range { var: _, collection } => {
                             self.collect_expr_variable_usages_into(collection, usages);
                         },
                     }
                 }
                 self.collect_expr_variable_usages_into(body, usages);
             },
-            ExprKind::ModuleCall { args, .. } => {
-                for arg in args {
-                    self.collect_expr_variable_usages_into(arg, usages);
+            ExprKind::Match { scrutinee, cases } => {
+                self.collect_expr_variable_usages_into(scrutinee, usages);
+                for case in cases {
+                    self.collect_expr_variable_usages_into(&case.result, usages);
                 }
             },
-            _ => {}
+            ExprKind::TypeCheck { value, check_type: _ } => {
+                self.collect_expr_variable_usages_into(value, usages);
+            },
+            ExprKind::Quote(inner) => {
+                self.collect_expr_variable_usages_into(inner, usages);
+            },
+            ExprKind::Unquote(inner) => {
+                self.collect_expr_variable_usages_into(inner, usages);
+            },
+            ExprKind::UnquoteSplicing(inner) => {
+                self.collect_expr_variable_usages_into(inner, usages);
+            },
+            ExprKind::QuasiQuote(inner) => {
+                self.collect_expr_variable_usages_into(inner, usages);
+            },
+            ExprKind::Binary { op, left, right } => {
+                self.collect_expr_variable_usages_into(left, usages);
+                self.collect_expr_variable_usages_into(right, usages);
+            },
+            ExprKind::Literal(_) => {
+                // Literals don't contain variable usages
+            },
         }
     }
     
@@ -260,210 +275,262 @@ impl DeadCodeElimination {
                     // Always keep macro definitions
                     transformed_forms.push(form.clone());
                 },
+                TopLevelKind::Alias { name, .. } => {
+                    // Keep if the alias is used (similar to variable definitions)
+                    if self.used_variables.contains(name) {
+                        transformed_forms.push(form.clone());
+                    }
+                },
             }
         }
         
         Program { forms: transformed_forms }
     }
     
-    /// Process a top-level form to eliminate dead code within it
+    /// Process a top-level form, removing dead code
     fn process_top_level(&mut self, form: &TopLevel) -> TopLevel {
         match &form.node {
-            TopLevelKind::TypeDef { .. } => form.clone(),
             TopLevelKind::VarDef { name, value } => {
                 // Process the value expression
                 let processed_value = self.process_expr(value);
                 
-                TopLevel {
-                    span: form.span,
-                    node: TopLevelKind::VarDef {
+                // Register this variable definition (though in this method we don't need to)
+                
+                // Return the processed variable definition
+                Located::new(
+                    TopLevelKind::VarDef {
                         name: name.clone(),
                         value: processed_value,
                     },
-                }
+                    form.span,
+                )
             },
-            TopLevelKind::ModuleImport { .. } => form.clone(),
+            TopLevelKind::TypeDef { name, ty } => {
+                // Register the type alias in the environment
+                let processed_form = Located::new(
+                    TopLevelKind::TypeDef {
+                        name: name.clone(),
+                        ty: ty.clone(),
+                    },
+                    form.span,
+                );
+                
+                processed_form
+            },
+            TopLevelKind::ModuleImport { name, path, is_header } => {
+                // Always add module imports - they're needed for module function calls
+                let processed_form = Located::new(
+                    TopLevelKind::ModuleImport {
+                        name: name.clone(),
+                        path: path.clone(),
+                        is_header: *is_header,
+                    },
+                    form.span,
+                );
+                
+                processed_form
+            },
             TopLevelKind::Expr(expr) => {
-                // Process the standalone expression
+                // Process the expression
                 let processed_expr = self.process_expr(&Located::new(expr.clone(), form.span));
                 
-                TopLevel {
-                    span: form.span,
-                    node: TopLevelKind::Expr(processed_expr.node),
-                }
+                // Return the processed expression
+                Located::new(
+                    TopLevelKind::Expr(processed_expr.node),
+                    form.span,
+                )
             },
             TopLevelKind::MacroDef { name, params, body } => {
-                // Macros are not processed by dead code elimination
-                form.clone()
-            }
+                // Process the macro body
+                let processed_body = self.process_expr(body);
+                
+                // Return the processed macro definition
+                Located::new(
+                    TopLevelKind::MacroDef {
+                        name: name.clone(),
+                        params: params.clone(),
+                        body: processed_body,
+                    },
+                    form.span,
+                )
+            },
+            TopLevelKind::Alias { name, module, function } => {
+                // Only add used alias definitions or keep all if keep_all is true
+                if self.used_variables.contains(name) {
+                    // Process the alias definition
+                    let processed_form = self.process_top_level(form);
+                    processed_form
+                } else {
+                    form.clone()
+                }
+            },
         }
     }
     
     /// Process an expression to eliminate dead code within it
     fn process_expr(&mut self, expr: &Expr) -> Expr {
         match &expr.node {
-            ExprKind::Do(exprs) => {
-                // Eliminate code after return statements
-                let mut processed_exprs = Vec::new();
-                let mut found_return = false;
-                
-                for expr in exprs {
-                    if found_return {
-                        // Skip expressions after a return
-                        continue;
-                    }
-                    
-                    let processed_expr = self.process_expr(expr);
-                    processed_exprs.push(processed_expr.clone());
-                    
-                    // Check if this is a return statement
-                    if let ExprKind::Return(_) = &processed_expr.node {
-                        found_return = true;
-                    }
-                }
-                
-                // If the block is now empty, return a unit value
-                if processed_exprs.is_empty() {
-                    return Located::new(
-                        ExprKind::Literal(Literal::Null),
-                        expr.span,
-                    );
-                }
-                
-                Located::new(ExprKind::Do(processed_exprs), expr.span)
+            ExprKind::Symbol(name) => {
+                // Symbol nodes are unchanged
+                expr.clone()
             },
-            ExprKind::If { condition, then_branch, else_branch } => {
-                // Check for constant conditions
-                if let ExprKind::Literal(lit) = &condition.node {
-                    match lit {
-                        Literal::Boolean(true) => {
-                            // Condition is always true, just return the then branch
-                            return self.process_expr(then_branch);
-                        },
-                        Literal::Boolean(false) => {
-                            // Condition is always false, return the else branch if it exists
-                            if let Some(else_expr) = else_branch {
-                                return self.process_expr(else_expr);
-                            } else {
-                                // No else branch, return a unit value
-                                return Located::new(
-                                    ExprKind::Literal(Literal::Null),
-                                    expr.span,
-                                );
-                            }
-                        },
-                        _ => {}
-                    }
-                }
-                
-                // Process condition and branches normally
-                let processed_condition = self.process_expr(condition);
-                let processed_then = self.process_expr(then_branch);
-                let processed_else = if let Some(else_expr) = else_branch {
-                    Some(Box::new(self.process_expr(else_expr)))
-                } else {
-                    None
-                };
-                
+            ExprKind::Literal(lit) => {
+                // Literal nodes are unchanged
+                expr.clone()
+            },
+            ExprKind::Addr(inner) => {
+                let processed_inner = self.process_expr(inner);
                 Located::new(
-                    ExprKind::If {
-                        condition: Box::new(processed_condition),
-                        then_branch: Box::new(processed_then),
-                        else_branch: processed_else,
+                    ExprKind::Addr(Box::new(processed_inner)),
+                    expr.span
+                )
+            },
+            ExprKind::Load(inner) => {
+                let processed_inner = self.process_expr(inner);
+                Located::new(
+                    ExprKind::Load(Box::new(processed_inner)),
+                    expr.span
+                )
+            },
+            ExprKind::Store { addr, value } => {
+                let processed_addr = self.process_expr(addr);
+                let processed_value = self.process_expr(value);
+                Located::new(
+                    ExprKind::Store {
+                        addr: Box::new(processed_addr),
+                        value: Box::new(processed_value),
                     },
                     expr.span
                 )
             },
-            ExprKind::Binary { op, left, right } => {
-                // Process operands
-                let processed_left = self.process_expr(left);
-                let processed_right = self.process_expr(right);
-                
-                // Check for constant folding opportunities
-                if let (ExprKind::Literal(left_lit), ExprKind::Literal(right_lit)) = (&processed_left.node, &processed_right.node) {
-                    if let Some(result) = self.fold_binary_op(op.clone(), left_lit, right_lit) {
-                        return Located::new(ExprKind::Literal(result), expr.span);
-                    }
-                }
-                
+            ExprKind::FieldAccess { object, field } => {
+                let processed_object = self.process_expr(object);
                 Located::new(
-                    ExprKind::Binary {
-                        op: op.clone(),
-                        left: Box::new(processed_left),
-                        right: Box::new(processed_right),
+                    ExprKind::FieldAccess {
+                        object: Box::new(processed_object),
+                        field: field.clone(),
                     },
                     expr.span
                 )
             },
-            ExprKind::Return(val) => {
-                // Process the returned value
-                let processed_val = self.process_expr(val);
-                
+            ExprKind::SetField { object, field, value } => {
+                let processed_object = self.process_expr(object);
+                let processed_value = self.process_expr(value);
                 Located::new(
-                    ExprKind::Return(Box::new(processed_val)),
-                    expr.span
-                )
-            },
-            ExprKind::Match { scrutinee, cases } => {
-                // Process the scrutinee
-                let processed_scrutinee = self.process_expr(scrutinee);
-                
-                // Process each case
-                let mut processed_cases = Vec::new();
-                for case in cases {
-                    let processed_result = self.process_expr(&case.result);
-                    processed_cases.push(crate::ast::MatchCase {
-                        pattern: case.pattern.clone(),
-                        result: processed_result,
-                    });
-                }
-                
-                Located::new(
-                    ExprKind::Match {
-                        scrutinee: Box::new(processed_scrutinee),
-                        cases: processed_cases,
+                    ExprKind::SetField {
+                        object: Box::new(processed_object),
+                        field: field.clone(),
+                        value: Box::new(processed_value),
                     },
                     expr.span
                 )
             },
-            ExprKind::For { iterator, body } => {
-                // Process the body
-                let processed_body = self.process_expr(body);
-                
-                // Process the iterator if present
-                let processed_iterator = if let Some(iter) = iterator {
-                    match &**iter {
-                        crate::ast::ForIterator::Condition(cond) => {
-                            let processed_cond = self.process_expr(cond);
-                            Some(Box::new(crate::ast::ForIterator::Condition(processed_cond)))
-                        },
-                        crate::ast::ForIterator::Range { var, collection } => {
-                            let processed_collection = self.process_expr(collection);
-                            Some(Box::new(crate::ast::ForIterator::Range {
-                                var: var.clone(),
-                                collection: processed_collection,
-                            }))
-                        },
-                    }
-                } else {
-                    None
-                };
-                
+            ExprKind::SetIndex { array, index, value } => {
+                let processed_array = self.process_expr(array);
+                let processed_index = self.process_expr(index);
+                let processed_value = self.process_expr(value);
                 Located::new(
-                    ExprKind::For {
-                        iterator: processed_iterator,
-                        body: Box::new(processed_body),
+                    ExprKind::SetIndex {
+                        array: Box::new(processed_array),
+                        index: Box::new(processed_index),
+                        value: Box::new(processed_value),
+                    },
+                    expr.span
+                )
+            },
+            ExprKind::SetAddr { addr, value } => {
+                let processed_addr = self.process_expr(addr);
+                let processed_value = self.process_expr(value);
+                Located::new(
+                    ExprKind::SetAddr {
+                        addr: Box::new(processed_addr),
+                        value: Box::new(processed_value),
+                    },
+                    expr.span
+                )
+            },
+            ExprKind::DataConstructor { tag, value } => {
+                let processed_value = value.as_ref().map(|v| Box::new(self.process_expr(v)));
+                Located::new(
+                    ExprKind::DataConstructor {
+                        tag: tag.clone(),
+                        value: processed_value,
                     },
                     expr.span
                 )
             },
             ExprKind::Call { name, args } => {
-                // Process arguments
                 let mut processed_args = Vec::new();
                 for arg in args {
                     processed_args.push(self.process_expr(arg));
                 }
                 
+                // Check if this is an operator function call with constant arguments
+                // that can be constant-folded
+                if ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">="].contains(&name.as_str())
+                    && processed_args.len() == 2 {
+                    if let (ExprKind::Literal(left_lit), ExprKind::Literal(right_lit)) = 
+                          (&processed_args[0].node, &processed_args[1].node) {
+                        // Try to fold constants in operator functions
+                        let folded = match (left_lit, right_lit, name.as_str()) {
+                            // Integer operations
+                            (Literal::Integer(l), Literal::Integer(r), "+") => Some(Literal::Integer(l + r)),
+                            (Literal::Integer(l), Literal::Integer(r), "-") => Some(Literal::Integer(l - r)),
+                            (Literal::Integer(l), Literal::Integer(r), "*") => Some(Literal::Integer(l * r)),
+                            (Literal::Integer(l), Literal::Integer(r), "/") => {
+                                if *r == 0 {
+                                    None // Division by zero, can't fold
+                                } else {
+                                    Some(Literal::Integer(l / r))
+                                }
+                            },
+                            (Literal::Integer(l), Literal::Integer(r), "%") => {
+                                if *r == 0 {
+                                    None // Modulo by zero, can't fold
+                                } else {
+                                    Some(Literal::Integer(l % r))
+                                }
+                            },
+                            // Integer comparisons
+                            (Literal::Integer(l), Literal::Integer(r), "==") => Some(Literal::Boolean(l == r)),
+                            (Literal::Integer(l), Literal::Integer(r), "!=") => Some(Literal::Boolean(l != r)),
+                            (Literal::Integer(l), Literal::Integer(r), "<") => Some(Literal::Boolean(l < r)),
+                            (Literal::Integer(l), Literal::Integer(r), ">") => Some(Literal::Boolean(l > r)),
+                            (Literal::Integer(l), Literal::Integer(r), "<=") => Some(Literal::Boolean(l <= r)),
+                            (Literal::Integer(l), Literal::Integer(r), ">=") => Some(Literal::Boolean(l >= r)),
+                            
+                            // Float operations
+                            (Literal::Float(l), Literal::Float(r), "+") => Some(Literal::Float(l + r)),
+                            (Literal::Float(l), Literal::Float(r), "-") => Some(Literal::Float(l - r)),
+                            (Literal::Float(l), Literal::Float(r), "*") => Some(Literal::Float(l * r)),
+                            (Literal::Float(l), Literal::Float(r), "/") => Some(Literal::Float(l / r)),
+                            // Float comparisons
+                            (Literal::Float(l), Literal::Float(r), "==") => Some(Literal::Boolean(l == r)),
+                            (Literal::Float(l), Literal::Float(r), "!=") => Some(Literal::Boolean(l != r)),
+                            (Literal::Float(l), Literal::Float(r), "<") => Some(Literal::Boolean(l < r)),
+                            (Literal::Float(l), Literal::Float(r), ">") => Some(Literal::Boolean(l > r)),
+                            (Literal::Float(l), Literal::Float(r), "<=") => Some(Literal::Boolean(l <= r)),
+                            (Literal::Float(l), Literal::Float(r), ">=") => Some(Literal::Boolean(l >= r)),
+                            
+                            // Boolean operations
+                            (Literal::Boolean(l), Literal::Boolean(r), "==") => Some(Literal::Boolean(l == r)),
+                            (Literal::Boolean(l), Literal::Boolean(r), "!=") => Some(Literal::Boolean(l != r)),
+                            
+                            // Default - can't fold
+                            _ => None,
+                        };
+                        
+                        // Return the folded literal if successful
+                        if let Some(result) = folded {
+                            return Located::new(
+                                ExprKind::Literal(result),
+                                expr.span
+                            );
+                        }
+                    }
+                }
+                
+                // Return the unchanged call if we couldn't fold it
                 Located::new(
                     ExprKind::Call {
                         name: name.clone(),
@@ -473,7 +540,6 @@ impl DeadCodeElimination {
                 )
             },
             ExprKind::ModuleCall { module, function, args } => {
-                // Process arguments
                 let mut processed_args = Vec::new();
                 for arg in args {
                     processed_args.push(self.process_expr(arg));
@@ -488,96 +554,101 @@ impl DeadCodeElimination {
                     expr.span
                 )
             },
-            ExprKind::FieldAccess { object, field } => {
-                // Process the object
-                let processed_object = self.process_expr(object);
+            ExprKind::Do(expressions) => {
+                let mut processed_expressions = Vec::new();
+                for inner_expr in expressions {
+                    processed_expressions.push(self.process_expr(inner_expr));
+                }
                 
                 Located::new(
-                    ExprKind::FieldAccess {
-                        object: Box::new(processed_object),
-                        field: field.clone(),
+                    ExprKind::Do(processed_expressions),
+                    expr.span
+                )
+            },
+            ExprKind::Return(inner) => {
+                let processed_inner = self.process_expr(inner);
+                Located::new(
+                    ExprKind::Return(Box::new(processed_inner)),
+                    expr.span
+                )
+            },
+            ExprKind::If { condition, then_branch, else_branch } => {
+                let processed_condition = self.process_expr(condition);
+                let processed_then = self.process_expr(then_branch);
+                let processed_else = else_branch.as_ref().map(|e| Box::new(self.process_expr(e)));
+                
+                // Check if the condition is a boolean literal, if so, we can simplify
+                if let ExprKind::Literal(Literal::Boolean(value)) = &processed_condition.node {
+                    if *value {
+                        // True condition, return the then branch
+                        return processed_then;
+                    } else if let Some(else_expr) = processed_else {
+                        // False condition, return the else branch
+                        return *else_expr;
+                    } else {
+                        // False condition, no else branch, return a dummy value
+                        // In a real compiler, this would be a more complex decision
+                        return Located::new(
+                            ExprKind::Literal(Literal::Null),
+                            expr.span
+                        );
+                    }
+                }
+                
+                Located::new(
+                    ExprKind::If {
+                        condition: Box::new(processed_condition),
+                        then_branch: Box::new(processed_then),
+                        else_branch: processed_else,
                     },
                     expr.span
                 )
             },
-            ExprKind::SetField { object, field, value } => {
-                // Process the object and value
-                let processed_object = self.process_expr(object);
-                let processed_value = self.process_expr(value);
+            ExprKind::For { iterator, body } => {
+                let processed_body = self.process_expr(body);
+                
+                let processed_iterator = iterator.as_ref().map(|iter| {
+                    Box::new(match &**iter {
+                        crate::ast::ForIterator::Condition(cond) => {
+                            crate::ast::ForIterator::Condition(self.process_expr(cond))
+                        },
+                        crate::ast::ForIterator::Range { var, collection } => {
+                            crate::ast::ForIterator::Range {
+                                var: var.clone(),
+                                collection: self.process_expr(collection),
+                            }
+                        },
+                    })
+                });
                 
                 Located::new(
-                    ExprKind::SetField {
-                        object: Box::new(processed_object),
-                        field: field.clone(),
-                        value: Box::new(processed_value),
+                    ExprKind::For {
+                        iterator: processed_iterator,
+                        body: Box::new(processed_body),
                     },
                     expr.span
                 )
             },
-            ExprKind::SetIndex { array, index, value } => {
-                // Process the array, index, and value
-                let processed_array = self.process_expr(array);
-                let processed_index = self.process_expr(index);
-                let processed_value = self.process_expr(value);
+            ExprKind::Match { scrutinee, cases } => {
+                let processed_scrutinee = self.process_expr(scrutinee);
+                
+                let mut processed_cases = Vec::new();
+                for case in cases {
+                    processed_cases.push(crate::ast::MatchCase {
+                        pattern: case.pattern.clone(), // Patterns don't need processing
+                        result: self.process_expr(&case.result),
+                    });
+                }
                 
                 Located::new(
-                    ExprKind::SetIndex {
-                        array: Box::new(processed_array),
-                        index: Box::new(processed_index),
-                        value: Box::new(processed_value),
-                    },
-                    expr.span
-                )
-            },
-            ExprKind::Store { addr, value } => {
-                // Process the address and value
-                let processed_addr = self.process_expr(addr);
-                let processed_value = self.process_expr(value);
-                
-                Located::new(
-                    ExprKind::Store {
-                        addr: Box::new(processed_addr),
-                        value: Box::new(processed_value),
-                    },
-                    expr.span
-                )
-            },
-            ExprKind::Load(ptr) => {
-                // Process the pointer
-                let processed_ptr = self.process_expr(ptr);
-                
-                Located::new(
-                    ExprKind::Load(Box::new(processed_ptr)),
-                    expr.span
-                )
-            },
-            ExprKind::Addr(val) => {
-                // Process the value
-                let processed_val = self.process_expr(val);
-                
-                Located::new(
-                    ExprKind::Addr(Box::new(processed_val)),
-                    expr.span
-                )
-            },
-            ExprKind::DataConstructor { tag, value } => {
-                // Process the value if present
-                let processed_value = if let Some(val) = value {
-                    Some(Box::new(self.process_expr(val)))
-                } else {
-                    None
-                };
-                
-                Located::new(
-                    ExprKind::DataConstructor {
-                        tag: tag.clone(),
-                        value: processed_value,
+                    ExprKind::Match {
+                        scrutinee: Box::new(processed_scrutinee),
+                        cases: processed_cases,
                     },
                     expr.span
                 )
             },
             ExprKind::TypeCheck { value, check_type } => {
-                // Process the value
                 let processed_value = self.process_expr(value);
                 
                 Located::new(
@@ -589,78 +660,49 @@ impl DeadCodeElimination {
                 )
             },
             ExprKind::Quote(inner) => {
-                // Quoted expressions are not evaluated, so we don't need to process them
-                expr.clone()
+                let processed_inner = self.process_expr(inner);
+                
+                Located::new(
+                    ExprKind::Quote(Box::new(processed_inner)),
+                    expr.span
+                )
             },
             ExprKind::Unquote(inner) => {
-                // Unquoted expressions should only appear inside quasi-quotes
-                expr.clone()
+                let processed_inner = self.process_expr(inner);
+                
+                Located::new(
+                    ExprKind::Unquote(Box::new(processed_inner)),
+                    expr.span
+                )
             },
             ExprKind::UnquoteSplicing(inner) => {
-                // Unquote-splicing expressions should only appear inside quasi-quotes
-                expr.clone()
+                let processed_inner = self.process_expr(inner);
+                
+                Located::new(
+                    ExprKind::UnquoteSplicing(Box::new(processed_inner)),
+                    expr.span
+                )
             },
             ExprKind::QuasiQuote(inner) => {
-                // Quasi-quoted expressions are like quoted expressions
-                expr.clone()
+                let processed_inner = self.process_expr(inner);
+                
+                Located::new(
+                    ExprKind::QuasiQuote(Box::new(processed_inner)),
+                    expr.span
+                )
             },
-            _ => expr.clone(),
-        }
-    }
-    
-    /// Attempt to fold a binary operation with constant operands
-    fn fold_binary_op(&self, op: BinaryOp, left: &Literal, right: &Literal) -> Option<Literal> {
-        match (left, right) {
-            (Literal::Integer(l), Literal::Integer(r)) => {
-                match op {
-                    BinaryOp::Add => Some(Literal::Integer(l + r)),
-                    BinaryOp::Sub => Some(Literal::Integer(l - r)),
-                    BinaryOp::Mul => Some(Literal::Integer(l * r)),
-                    BinaryOp::Div => {
-                        if *r != 0 {
-                            Some(Literal::Integer(l / r))
-                        } else {
-                            None // Division by zero
-                        }
+            ExprKind::Binary { op, left, right } => {
+                let processed_left = self.process_expr(left);
+                let processed_right = self.process_expr(right);
+                Located::new(
+                    ExprKind::Binary {
+                        op: *op,
+                        left: Box::new(processed_left),
+                        right: Box::new(processed_right),
                     },
-                    BinaryOp::Mod => {
-                        if *r != 0 {
-                            Some(Literal::Integer(l % r))
-                        } else {
-                            None // Modulo by zero
-                        }
-                    },
-                    BinaryOp::Eq => Some(Literal::Boolean(l == r)),
-                    BinaryOp::Ne => Some(Literal::Boolean(l != r)),
-                    BinaryOp::Lt => Some(Literal::Boolean(l < r)),
-                    BinaryOp::Gt => Some(Literal::Boolean(l > r)),
-                    BinaryOp::Le => Some(Literal::Boolean(l <= r)),
-                    BinaryOp::Ge => Some(Literal::Boolean(l >= r)),
-                }
+                    expr.span
+                )
             },
-            (Literal::Float(l), Literal::Float(r)) => {
-                match op {
-                    BinaryOp::Add => Some(Literal::Float(l + r)),
-                    BinaryOp::Sub => Some(Literal::Float(l - r)),
-                    BinaryOp::Mul => Some(Literal::Float(l * r)),
-                    BinaryOp::Div => Some(Literal::Float(l / r)),
-                    BinaryOp::Eq => Some(Literal::Boolean(l == r)),
-                    BinaryOp::Ne => Some(Literal::Boolean(l != r)),
-                    BinaryOp::Lt => Some(Literal::Boolean(l < r)),
-                    BinaryOp::Gt => Some(Literal::Boolean(l > r)),
-                    BinaryOp::Le => Some(Literal::Boolean(l <= r)),
-                    BinaryOp::Ge => Some(Literal::Boolean(l >= r)),
-                    _ => None, // Modulo not defined for floats
-                }
-            },
-            (Literal::Boolean(l), Literal::Boolean(r)) => {
-                match op {
-                    BinaryOp::Eq => Some(Literal::Boolean(l == r)),
-                    BinaryOp::Ne => Some(Literal::Boolean(l != r)),
-                    _ => None, // Other operations not defined for booleans
-                }
-            },
-            _ => None, // Incompatible types or unsupported operation
         }
     }
 } 

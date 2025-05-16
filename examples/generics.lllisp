@@ -25,58 +25,58 @@
 ;; Using generic types
 
 ;; Vector of integers
-(def int_vec (vector<i32> 10 20))
+(def int-vec (vector<i32> 10 20))
 
 ;; Vector of floats
-(def float_vec (vector<f64> 3.14 2.71))
+(def float-vec (vector<f64> 3.14 2.71))
 
 ;; Option types
-(def some_value (option<i32> :some 42))
-(def no_value (option<i32> :none))
+(def some-value (option<i32> :some 42))
+(def no-value (option<i32> :none))
 
 ;; Result types
 (def success (result<i32 string> :ok 100))
 (def failure (result<i32 string> :err "Something went wrong"))
 
 ;; Pair type
-(def int_string_pair (pair<i32 string> 42 "answer"))
+(def int-string-pair (pair<i32 string> 42 "answer"))
 
 ;; Function to create a vector
-(def make_vector 
-    (fn <t> [x y]
+(def make-vector 
+    (fn<t> [x y]
         (vector<t> x y)
     )
 )
 
 ;; Function to create an option
 (def some 
-    (fn <t> [value]
+    (fn<t> [value]
         (option<t> :some value)
     )
 )
 
 (def none 
-    (fn <t> []
+    (fn<t> []
         (option<t> :none)
     )
 )
 
 ;; Function to create a result
 (def ok 
-    (fn <o e> [value]
+    (fn<o e> [value]
         (result<o e> :ok value)
     )
 )
 
 (def err 
-    (fn <o e> [error]
+    (fn<o e> [error]
         (result<o e> :err error)
     )
 )
 
 ;; Function to print a vector
-(def print_vector 
-    (fn <t> [vec]
+(def print-vector 
+    (fn<t> [vec]
         (do
             (out "(")
             (out ($ :x vec))
@@ -88,8 +88,8 @@
 )
 
 ;; Function to handle an option
-(def handle_option 
-    (fn <t> [opt default]
+(def handle-option 
+    (fn<t> [opt default]
         (match opt
             [:some value] value
             [:none] default
@@ -98,35 +98,35 @@
 )
 
 ;; Function to handle a result
-(def handle_result 
-    (fn <o e> [res success_handler error_handler]
+(def handle-result 
+    (fn<o e> [res success-handler error-handler]
         (match res
-            [:ok value] (success_handler value)
-            [:err error] (error_handler error)
+            [:ok value] (success-handler value)
+            [:err error] (error-handler error)
         )
     )
 )
 
 ;; Examples of using the functions
-(def vec1 (make_vector<i32> 1 2))
-(print_vector<i32> vec1)
+(def vec1 (make-vector<i32> 1 2))
+(print-vector<i32> vec1)
 
 (def opt1 (some<i32> 42))
 (def opt2 (none<i32>))
 (out "\nOption value with default: ")
-(out (handle_option<i32> opt1 0))
+(out (handle-option<i32> opt1 0))
 (out "\nNone value with default: ")
-(out (handle_option<i32> opt2 0))
+(out (handle-option<i32> opt2 0))
 
 (def res1 (ok<i32 string> 42))
 (def res2 (err<i32 string> "Error occurred"))
 
-(handle_result<i32 string> res1 
+(handle-result<i32 string> res1 
     (fn [value] (out "\nSuccess: " value))
     (fn [error] (out "\nError: " error))
 )
 
-(handle_result<i32 string> res2
+(handle-result<i32 string> res2
     (fn [value] (out "\nSuccess: " value))
     (fn [error] (out "\nError: " error))
 ) 

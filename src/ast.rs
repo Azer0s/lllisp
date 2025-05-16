@@ -421,6 +421,13 @@ pub enum TopLevelKind {
         is_header: bool,
     }, // (def name (use "path")) or (def name (use :header "path"))
     
+    // Function alias definition
+    Alias {
+        name: String,
+        module: String,
+        function: String,
+    }, // (alias name module/function)
+    
     // Expression
     Expr(ExprKind),
     

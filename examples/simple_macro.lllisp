@@ -1,7 +1,7 @@
-;; Define a simple when macro
-(def when (macro [condition body]
-  `(if ~condition ~body null)))
+;; Simple macro test
 
-;; Test the when macro
-(when (< 5 10)
-  (+ 1 2)) 
+;; Define a macro that doubles its argument
+(def double (macro [x] (+ x x)))
+
+;; Use the macro
+(double 5) 

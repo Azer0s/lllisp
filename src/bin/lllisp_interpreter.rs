@@ -3,6 +3,8 @@ use std::env;
 use std::process;
 use lllisp::parser::parse_program;
 use lllisp::interpreter::Interpreter;
+use lllisp::macro_expander::MacroExpander;
+use lllisp::alias_folding::AliasFolding;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -18,11 +20,21 @@ fn main() {
         Ok(src) => {
             match parse_program(&src) {
                 Ok(program) => {
-                    println!("Successfully parsed program:");
+                    println!("Successfully parsed program with {} top-level forms", program.forms.len());
                     
-                    // Run the interpreter
+                    // Apply macro expansion
+                    let mut macro_expander = MacroExpander::new();
+                    let expanded_program = macro_expander.process_program(&program);
+                    println!("Program after macro expansion: {} top-level forms", expanded_program.forms.len());
+                    
+                    // Apply alias folding
+                    let mut alias_folder = AliasFolding::new();
+                    let folded_program = alias_folder.process_program(&expanded_program);
+                    println!("Program after alias folding: {} top-level forms", folded_program.forms.len());
+                    
+                    // Run the interpreter on the processed program
                     let mut interpreter = Interpreter::new();
-                    match interpreter.eval_program(&program) {
+                    match interpreter.eval_program(&folded_program) {
                         Ok(result) => {
                             println!("Program result: {:?}", result);
                         },

@@ -2,47 +2,36 @@ use chumsky::prelude::*;
 use std::ops::Range;
 
 use crate::ast::{
-    ExprKind, Literal, Program, Span, TopLevel, TopLevelKind, Type, Located, BinaryOp, Pattern, ForIterator, MatchCase
+    ExprKind, Literal, Program, Span, TopLevel, TopLevelKind, Type, Located, Pattern, ForIterator, MatchCase
 };
 
 // Parse a complete LLLisp program
 pub fn parse_program(src: &str) -> Result<Program, Vec<Simple<char>>> {
-    // Preprocess the input string to normalize whitespace and handle comments
     let processed_src = preprocess_source(src);
     
+    // Use the top_level_parser to parse all top-level forms
     println!("Parsing source: '{}'", processed_src);
     
-    let result = top_level_parser().parse(processed_src.as_str());
-    match result {
-        Ok(forms) => {
+    // We need to handle multiple top-level forms
+    // Use top_level_parser directly which returns a Vec<TopLevel>
+    let parser = top_level_parser()
+        .then_ignore(end())
+        .map(|forms| {
             println!("Successfully parsed {} top-level forms", forms.len());
-            Ok(Program { forms })
-        },
-        Err(errs) => {
-            println!("Parse errors: {:?}", errs);
-            Err(errs)
-        }
-    }
+            Program { forms }
+        });
+    
+    parser.parse(processed_src.as_str())
 }
 
 // Parse a single top-level form
 pub fn parse_form(src: &str) -> Result<TopLevel, Vec<Simple<char>>> {
-    // Preprocess the input string to normalize whitespace and handle comments
     let processed_src = preprocess_source(src);
     
-    match top_level_parser().parse(processed_src.as_str()) {
-        Ok(forms) => {
-            if forms.len() == 1 {
-                Ok(forms[0].clone())
-            } else {
-                Err(vec![Simple::custom(
-                    0..src.len(),
-                    "Expected a single top-level form"
-                )])
-            }
-        },
-        Err(errs) => Err(errs),
-    }
+    // Use the top_level combinator to parse a single top-level form
+    let parser = top_level().then_ignore(end());
+    
+    parser.parse(processed_src.as_str())
 }
 
 // Preprocess source to normalize whitespace and handle comments
@@ -161,8 +150,41 @@ fn top_level_parser() -> impl Parser<char, Vec<TopLevel>, Error = Simple<char>> 
         .then(ident())
         .then(expr_parser())
         .then(just(')'))
-        .map(|((((_l, _def), name), value), _r)| {
-            println!("Parsed variable definition: {} with expr: {:?}", name, value.node);
+        .map(|((((_, _), name), value), _)| {
+            println!("Parsing var_def for: {}", name);
+            // Check if this is a macro definition
+            if let ExprKind::Call { name: call_name, args } = &value.node {
+                println!("Checking if {} is a macro definition", name);
+                
+                if call_name == "macro" && args.len() >= 2 {
+                    // The first argument should be the parameter list in square brackets
+                    println!("Found macro call for {}, args: {}", name, args.len());
+                    
+                    if let ExprKind::Literal(Literal::Tuple(param_exprs)) = &args[0].node {
+                        // Extract parameter names from the tuple
+                        let params = param_exprs.iter().filter_map(|expr| {
+                            if let ExprKind::Symbol(param_name) = &expr.node {
+                                Some(param_name.clone())
+                            } else {
+                                None
+                            }
+                        }).collect::<Vec<_>>();
+                        
+                        // The body is the second argument
+                        if args.len() > 1 {
+                            let body = &args[1];
+                            println!("Creating macro definition: {} with {} params", name, params.len());
+                            return TopLevelKind::MacroDef { 
+                                name, 
+                                params, 
+                                body: body.clone() 
+                            };
+                        }
+                    }
+                }
+            }
+            
+            // Regular variable definition
             TopLevelKind::VarDef { name, value }
         })
         .map_with_span(|kind, span: Range<usize>| {
@@ -198,40 +220,42 @@ fn top_level_parser() -> impl Parser<char, Vec<TopLevel>, Error = Simple<char>> 
             Located::new(kind, Span::new(span.start, span.end))
         });
 
-    // Macro definition: (def name (macro [params] body))
-    let macro_def = just('(')
-        .then(just("def").padded())
+    // Function alias definition: (alias name module/function)
+    // This handles both simple "module/function" and nested "module/submodule/function" formats
+    let alias_def = just('(')
+        .then(just("alias").padded())
         .then(ident())
-        .then(
-            just('(')
-            .then(just("macro").padded())
-            .then(
-                just('[')
-                .then(ident().padded().repeated())
-                .then(just(']'))
-                .map(|((_l, params), _r)| params)
-            )
-            .then(expr_parser())
-            .then(just(')'))
-            .map(|((((_, _), params), body), _)| (params, body))
-        )
+        .then(ident().padded())
         .then(just(')'))
-        .map(|((((_l, _def), name), (params, body)), _r)| {
-            println!("Parsed macro definition: {} with {} params", name, params.len());
-            TopLevelKind::MacroDef { name, params, body }
+        .map(|((((_l, _alias), name), module_path), _r)| {
+            // Check if the module_path contains a slash
+            if let Some(last_slash_pos) = module_path.rfind('/') {
+                let module = module_path[0..last_slash_pos].to_string();
+                let function = module_path[last_slash_pos + 1..].to_string();
+                println!("Parsed alias definition: {} -> {}/{}", name, module, function);
+                TopLevelKind::Alias {
+                    name,
+                    module,
+                    function,
+                }
+            } else {
+                // If there's no slash, this is an error - aliases must have the module/function format
+                panic!("Invalid alias format: expected module/function but got {}", module_path);
+            }
         })
         .map_with_span(|kind, span: Range<usize>| {
             Located::new(kind, Span::new(span.start, span.end))
-        });
+        })
+        .labelled("alias definition");
 
     // Combine all top-level forms
     choice((
         type_def.labelled("type definition"),
-        module_import.labelled("module import"),
         var_def.labelled("variable definition"),
-        macro_def.labelled("macro definition"),
+        module_import.labelled("module import"),
+        alias_def.labelled("alias definition"),
         top_level_module_call.labelled("module function call"),
-        expr_form.labelled("expression")
+        expr_form.labelled("expression"),
     ))
     .padded()
     .repeated()
@@ -241,11 +265,11 @@ fn top_level_parser() -> impl Parser<char, Vec<TopLevel>, Error = Simple<char>> 
 // Identifier parser - alphanumeric plus some special characters
 fn ident() -> impl Parser<char, String, Error = Simple<char>> {
     let first = filter(|c: &char| {
-        c.is_alphabetic() || *c == '_' || *c == '-'
+        c.is_alphabetic() || *c == '_' || *c == '-' || *c == '&'
     });
     
     let rest = filter(|c: &char| {
-        c.is_alphanumeric() || *c == '_' || *c == '-' || *c == '/'
+        c.is_alphanumeric() || *c == '_' || *c == '-' || *c == '/' || *c == '&'
     }).repeated();
     
     first.chain(rest).collect::<String>().padded()
@@ -443,7 +467,7 @@ fn type_parser() -> impl Parser<char, Type, Error = Simple<char>> {
             data_type,
             shorthand_tuple_type,
             union_type,
-        )).padded()
+        ))
     })
 }
 
@@ -453,6 +477,22 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
         let literal = literal_parser().map(|lit| Located::new(ExprKind::Literal(lit), Span::new(0, 0)));
         
         let symbol = ident().map(|name| Located::new(ExprKind::Symbol(name), Span::new(0, 0)));
+        
+        // Macro parameter list: [param1 param2 ...]
+        let macro_param_list = just('[')
+            .then(ident().padded().repeated())
+            .then(just(']'))
+            .map_with_span(|((_, params), _), span: Range<usize>| {
+                println!("Parsed macro parameter list: {:?}", params);
+                // Convert parameter list to a tuple literal with symbol expressions
+                let param_exprs = params.into_iter()
+                    .map(|param| Located::new(ExprKind::Symbol(param), Span::new(0, 0)))
+                    .collect();
+                Located::new(
+                    ExprKind::Literal(Literal::Tuple(param_exprs)),
+                    Span::new(span.start, span.end)
+                )
+            });
         
         // Generic instance call: (name<type1 type2> arg1 arg2...)
         let generic_instance_call = just('(')
@@ -471,13 +511,15 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             )
             .then(expr.clone().repeated())
             .then(just(')'))
-            .map(|(((_l, name), args), _r)| {
-                ExprKind::Call {
-                    name,
-                    args,
-                }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((_l, name), args), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::Call {
+                        name,
+                        args,
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
         
         // Function expression: (fn [params] return-type body)
         let fn_expr = just('(')
@@ -491,38 +533,46 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(expr.clone()) // return type
             .then(expr.clone()) // body
             .then(just(')'))
-            .map(|(((((_l, _fn), params), return_type), body), _r)| {
+            .map_with_span(|(((((_l, _fn), params), return_type), body), _r), span: Range<usize>| {
                 println!("Parsed function expression with {} params", params.len());
-                ExprKind::Call {
-                    name: "fn".to_string(),
-                    args: vec![
-                        Located::new(ExprKind::Literal(Literal::Tuple(params)), Span::new(0, 0)),
-                        return_type,
-                        body
-                    ],
-                }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+                Located::new(
+                    ExprKind::Call {
+                        name: "fn".to_string(),
+                        args: vec![
+                            Located::new(ExprKind::Literal(Literal::Tuple(params)), Span::new(0, 0)),
+                            return_type,
+                            body
+                        ],
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
             
         // Data constructor: [:tag] or [:tag expr]
         let data_constructor = just('[')
             .then(just(':').then(ident()).map(|(_, name)| name))
             .then(expr.clone().padded().or_not())
             .then(just(']'))
-            .map(|(((_, tag), value_opt), _)| {
-                ExprKind::DataConstructor {
-                    tag,
-                    value: value_opt.map(Box::new),
-                }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((_, tag), value_opt), _), span: Range<usize>| {
+                Located::new(
+                    ExprKind::DataConstructor {
+                        tag,
+                        value: value_opt.map(Box::new),
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
             
         // Tuple literal: [expr1 expr2 ...]
         let tuple_literal = just('[')
-            .then(expr.clone().padded().repeated().at_least(1))
+            .then(expr.clone().padded().repeated())
             .then(just(']'))
-            .map(|((_l, exprs), _r)| ExprKind::Literal(Literal::Tuple(exprs)))
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|((_, elements), _), span: Range<usize>| {
+                Located::new(
+                    ExprKind::Literal(Literal::Tuple(elements)),
+                    Span::new(span.start, span.end)
+                )
+            });
         
         // If expression: (if condition then-branch else-branch)
         let if_expr = just('(')
@@ -531,14 +581,16 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(expr.clone())
             .then(expr.clone())
             .then(just(')'))
-            .map(|(((((_l, _if), condition), then_branch), else_branch), _r)| {
-                ExprKind::If {
-                    condition: Box::new(condition),
-                    then_branch: Box::new(then_branch),
-                    else_branch: Some(Box::new(else_branch)),
-                }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((((_l, _if), condition), then_branch), else_branch), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::If {
+                        condition: Box::new(condition),
+                        then_branch: Box::new(then_branch),
+                        else_branch: Some(Box::new(else_branch)),
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // For loop: (for iterator body) or (for condition body)
         let for_expr = just('(')
@@ -567,21 +619,27 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             )
             .then(expr.clone()) // Loop body
             .then(just(')'))
-            .map(|((((_l, _for), iterator), body), _r)| {
-                ExprKind::For {
-                    iterator,
-                    body: Box::new(body),
-                }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|((((_l, _for), iterator), body), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::For {
+                        iterator,
+                        body: Box::new(body),
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
         
         // Do block: (do expr1 expr2 ...)
         let do_block = just('(')
             .then(just("do").padded())
             .then(expr.clone().repeated())
             .then(just(')'))
-            .map(|(((_l, _do), exprs), _r)| ExprKind::Do(exprs))
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((_l, _do), exprs), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::Do(exprs),
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Module function call: (module/function arg1 arg2 ...)
         let module_call = just('(')
@@ -596,54 +654,65 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             )
             .then(expr.clone().repeated())
             .then(just(')'))
-            .map(|(((_l, (module, function)), args), _r)| {
+            .map_with_span(|(((_l, (module, function)), args), _r), span: Range<usize>| {
                 println!("Parsed module call: {}/{} with {} args", module, function, args.len());
-                ExprKind::ModuleCall { module, function, args }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| {
-                Located::new(expr_kind, Span::new(span.start, span.end))
+                Located::new(
+                    ExprKind::ModuleCall { module, function, args },
+                    Span::new(span.start, span.end)
+                )
             });
 
-        // Function call: (name arg1 arg2 ...)
-        let call = just('(')
+        // Function call: (name arg1 arg2...)
+        let fn_call = just('(')
             .then(ident())
             .then(expr.clone().repeated())
             .then(just(')'))
-            .map(|(((_l, name), args), _r)| {
-                // Check if the name contains a slash (module call)
-                if let Some(slash_pos) = name.rfind('/') {
-                    let module = name[..slash_pos].to_string();
-                    let function = name[slash_pos+1..].to_string();
-                    println!("Parsed module call in function position: {}/{}", module, function);
-                    ExprKind::ModuleCall { module, function, args }
-                } else {
-                    // Special debugging for function expressions
-                    if name == "fn" {
-                        println!("Attempting to parse function expression with {} args", args.len());
-                        for (i, arg) in args.iter().enumerate() {
-                            println!("Function arg {}: {:?}", i, arg.node);
-                        }
+            .map_with_span(|(((_, name), args), _), span: Range<usize>| {
+                // Special handling for macro
+                if name == "macro" && args.len() >= 1 {
+                    // Check if the first argument has square brackets (Tuple literal from macro_param_list)
+                    println!("Found macro call, checking for parameter list");
+                    
+                    // Parse the args for macro parameters and body
+                    if let Some(body) = args.get(1) {
+                        println!("Parsed macro call with parameter list and body");
                     }
-                    ExprKind::Call { name, args }
                 }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+                
+                println!("Parsed function call: {} with {} args", name, args.len());
+                
+                Located::new(
+                    ExprKind::Call {
+                        name,
+                        args,
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Memory operations: (addr expr)
         let addr = just('(')
             .then(just("addr").padded())
             .then(expr.clone())
             .then(just(')'))
-            .map(|(((_l, _addr), expr), _r)| ExprKind::Addr(Box::new(expr)))
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((_l, _addr), expr), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::Addr(Box::new(expr)),
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Load operation: (load expr)
         let load = just('(')
             .then(just("load").padded())
             .then(expr.clone())
             .then(just(')'))
-            .map(|(((_l, _load), expr), _r)| ExprKind::Load(Box::new(expr)))
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((_l, _load), expr), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::Load(Box::new(expr)),
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Store operation: (store addr value)
         let store = just('(')
@@ -651,8 +720,12 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(expr.clone())
             .then(expr.clone())
             .then(just(')'))
-            .map(|((((_l, _store), addr), value), _r)| ExprKind::Store { addr: Box::new(addr), value: Box::new(value) })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|((((_l, _store), addr), value), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::Store { addr: Box::new(addr), value: Box::new(value) },
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Field access: ($ :field object)
         let field_access = just('(')
@@ -660,11 +733,15 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(just(':').then(ident()).map(|(_, name)| name))
             .then(expr.clone())
             .then(just(')'))
-            .map(|((((_l, _dollar), field), object), _r)| ExprKind::FieldAccess { 
-                object: Box::new(object),
-                field,
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|((((_l, _dollar), field), object), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::FieldAccess { 
+                        object: Box::new(object),
+                        field,
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Field set: ($ :field object value)
         let field_set = just('(')
@@ -673,15 +750,19 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(expr.clone())
             .then(expr.clone())
             .then(just(')'))
-            .map(|(((((_l, _dollar), field), object), value), _r)| ExprKind::SetField { 
-                object: Box::new(object),
-                field,
-                value: Box::new(value),
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((((_l, _dollar), field), object), value), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::SetField { 
+                        object: Box::new(object),
+                        field,
+                        value: Box::new(value),
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Index set: ($ [index] array value)
-        let index_set = just('(')
+        let array_index_set = just('(')
             .then(just("$").padded())
             .then(just('['))
             .then(expr.clone())
@@ -689,12 +770,16 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(expr.clone())
             .then(expr.clone())
             .then(just(')'))
-            .map(|(((((((_, _), _), index), _), array), value), _)| ExprKind::SetIndex {
-                array: Box::new(array),
-                index: Box::new(index),
-                value: Box::new(value),
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|(((((((_, _), _), index), _), array), value), _), span: Range<usize>| {
+                Located::new(
+                    ExprKind::SetIndex {
+                        array: Box::new(array),
+                        index: Box::new(index),
+                        value: Box::new(value),
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Address set: ($ addr value) - for raw memory access
         let addr_set = just('(')
@@ -702,31 +787,58 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(expr.clone())
             .then(expr.clone())
             .then(just(')'))
-            .map(|((((_, _), addr), value), _)| ExprKind::SetAddr {
-                addr: Box::new(addr),
-                value: Box::new(value),
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|((((_, _), addr), value), _), span: Range<usize>| {
+                Located::new(
+                    ExprKind::SetAddr {
+                        addr: Box::new(addr),
+                        value: Box::new(value),
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
 
-        // Binary operations: (op left right)
-        let binary_op = just('(')
-            .then(choice((
-                just("+").to(BinaryOp::Add),
-                just("-").to(BinaryOp::Sub),
-                just("*").to(BinaryOp::Mul),
-                just("/").to(BinaryOp::Div),
-                just("%").to(BinaryOp::Mod),
-                just("==").to(BinaryOp::Eq),
-                just("!=").to(BinaryOp::Ne),
-                just("<").to(BinaryOp::Lt),
-                just(">").to(BinaryOp::Gt),
-                just("<=").to(BinaryOp::Le),
-                just(">=").to(BinaryOp::Ge),
-            )).padded())
-            .then(expr.clone())
+        // Type check operation: (is type value)
+        let type_check = just('(')
+            .then(just("is").padded())
+            .then(type_parser())
             .then(expr.clone())
             .then(just(')'))
-            .map(|((((_l, op), left), right), _r)| ExprKind::Binary { op, left: Box::new(left), right: Box::new(right) })
+            .map_with_span(|((((_l, _is), check_type), value), _r), span: Range<usize>| {
+                Located::new(
+                    ExprKind::TypeCheck {
+                        value: Box::new(value),
+                        check_type,
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
+
+        // Quote expression: 'expr
+        let quote = just('\'')
+            .ignore_then(expr.clone())
+            .map(|e| ExprKind::Quote(Box::new(e)))
+            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+
+        // Quasi-quote expression: `expr
+        let quasi_quote = just('`')
+            .ignore_then(expr.clone())
+            .map(|e| ExprKind::QuasiQuote(Box::new(e)))
+            .map_with_span(|expr_kind, span: Range<usize>| {
+                println!("Parsed quasi-quote expression");
+                Located::new(expr_kind, Span::new(span.start, span.end))
+            });
+
+        // Unquote expression: ~expr
+        let unquote = just('~')
+            .then(just('@').or_not())
+            .then(expr.clone())
+            .map(|((tilde, at), e)| {
+                if at.is_some() {
+                    ExprKind::UnquoteSplicing(Box::new(e))
+                } else {
+                    ExprKind::Unquote(Box::new(e))
+                }
+            })
             .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
 
         // Pattern parser for match expressions
@@ -744,9 +856,9 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
                 .map(|lit| crate::ast::Pattern::Literal(lit));
                 
             // Constructor pattern [:tag] or [:tag pattern]
-            let constructor_pattern = just('[')
+            let constructor = just('[')
                 .then(just(':').then(ident()).map(|(_, name)| name))
-                .then(pattern.clone().or_not())
+                .then(pattern.clone().padded().or_not())
                 .then(just(']'))
                 .map(|(((_, tag), subpattern), _)| {
                     crate::ast::Pattern::Constructor {
@@ -763,108 +875,108 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
                 
             choice((
                 wildcard,
-                constructor_pattern,
-                list_pattern,
-                literal_pattern,
                 binding,
-            )).padded()
+                literal_pattern,
+                constructor,
+                list_pattern,
+            ))
         });
         
         // Match case: pattern result
-        let _match_case = pattern.clone()
+        let match_case = pattern.clone()
             .then(expr.clone())
             .map(|(pattern, result)| MatchCase { pattern, result });
             
         // Match expression: (match expr [pattern1] result1 [pattern2] result2 ...)
-        let _match_expr = just('(')
-            .ignore_then(just("match").padded())
-            .ignore_then(expr.clone())
-            .then(pattern.padded().then(expr.clone()).repeated().at_least(1))
-            .then_ignore(just(')'))
-            .map(|(scrutinee, cases)| {
-                let match_cases = cases.into_iter()
-                    .map(|(pattern, result)| MatchCase { pattern, result })
-                    .collect();
-                
+        let match_expr = just('(')
+            .then(just("match").padded())
+            .then(expr.clone())
+            .then(
+                pattern.clone()
+                .then(expr.clone())
+                .map(|(pattern, result)| MatchCase { pattern, result })
+                .repeated()
+            )
+            .then(just(')'))
+            .map(|((((_, _), scrutinee), match_cases), _)| {
                 ExprKind::Match {
                     scrutinee: Box::new(scrutinee),
                     cases: match_cases,
                 }
+            })
+            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+
+        // Square bracket parameter list parser for macro definition
+        let square_bracket_params = just('[')
+            .then(ident().padded().repeated())
+            .then(just(']'))
+            .map_with_span(|((_, params), _), span: Range<usize>| {
+                println!("Parsed square bracket parameter list: {:?}", params);
+                let param_exprs = params.into_iter()
+                    .map(|param| Located::new(ExprKind::Symbol(param), Span::new(0, 0)))
+                    .collect();
+                Located::new(
+                    ExprKind::Literal(Literal::Tuple(param_exprs)),
+                    Span::new(span.start, span.end)
+                )
             });
 
-        // Type check operation: (is type value)
-        let type_check = just('(')
-            .then(just("is").padded())
-            .then(type_parser())
-            .then(expr.clone())
+        // Specific macro definition parser
+        let macro_def = just('(')
+            .then(just("macro").padded())
+            .then(square_bracket_params)
+            .then(expr.clone()) // Macro body
             .then(just(')'))
-            .map(|((((_l, _is), check_type), value), _r)| {
-                ExprKind::TypeCheck {
-                    value: Box::new(value),
-                    check_type,
-                }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
-
-        // Quote expression: 'expr
-        let quote = just('\'')
-            .ignore_then(expr.clone())
-            .map(|e| ExprKind::Quote(Box::new(e)))
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
-
-        // Quasi-quote expression: `expr
-        let quasi_quote = just('`')
-            .ignore_then(expr.clone())
-            .map(|e| ExprKind::QuasiQuote(Box::new(e)))
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
-
-        // Unquote expression: ~expr
-        let unquote = just('~')
-            .then(just('@').or_not())
-            .then(expr.clone())
-            .map(|((_tilde, at), e)| {
-                if at.is_some() {
-                    ExprKind::UnquoteSplicing(Box::new(e))
-                } else {
-                    ExprKind::Unquote(Box::new(e))
-                }
-            })
-            .map_with_span(|expr_kind, span: Range<usize>| Located::new(expr_kind, Span::new(span.start, span.end)));
+            .map_with_span(|((((_, _), params), body), _), span: Range<usize>| {
+                println!("Parsed macro definition expression");
+                Located::new(
+                    ExprKind::Call {
+                        name: "macro".to_string(),
+                        args: vec![params, body],
+                    },
+                    Span::new(span.start, span.end)
+                )
+            });
 
         // Combine all expression forms
         choice((
-            if_expr,
-            for_expr,
+            literal,
+            symbol,
             do_block,
+            if_expr,
             fn_expr,
-            module_call,
-            generic_instance_call,
-            call,
-            addr,
-            load,
+            for_expr,
+            data_constructor,
             store,
             field_access,
             field_set,
-            index_set,
+            array_index_set,
             addr_set,
-            data_constructor,
-            binary_op,
-            type_check,
-            tuple_literal,
-            literal,
-            symbol,
+            unquote,
             quote,
             quasi_quote,
-            unquote,
+            tuple_literal,
+            type_check,
+            match_expr,
+            module_call,
+            generic_instance_call,
+            fn_call,
+            addr,
+            load,
+            macro_def,
         ))
-        .padded()
+        .map_with_span(|expr, span: Range<usize>| {
+            // Update the span information
+            let mut expr = expr;
+            expr.span = Span::new(span.start, span.end);
+            expr
+        })
     })
 }
 
 // Literal parser
 fn literal_parser() -> impl Parser<char, Literal, Error = Simple<char>> {
     choice((
-        // Atom literals (with : prefix)
         just(':')
             .then(ident())
             .map(|(_, name)| Literal::Atom(name)),
@@ -947,6 +1059,76 @@ pub fn parse_module_call(src: &str) -> Result<Located<ExprKind>, Vec<Simple<char
             Err(vec![Simple::custom(0..1, "Not a module call")])
         },
         Err(errors) => Err(errors)
+    }
+}
+
+// Alias for the top_level parser
+fn top_level() -> impl Parser<char, TopLevel, Error = Simple<char>> {
+    top_level_parser().try_map(|forms, span| {
+        // If there are no forms, return an error
+        if forms.is_empty() {
+            // Create a dummy TopLevel with a meaningful error
+            return Err(Simple::custom(span, "No top-level forms were parsed"));
+        }
+        // Return the first form if there are multiple
+        Ok(forms.into_iter().next().unwrap())
+    })
+}
+
+// Special parser for macro definitions in the format (def name (macro [args] body))
+pub fn parse_macro_definition(src: &str) -> Result<TopLevel, Vec<Simple<char>>> {
+    // First parse the entire source as a program
+    let program = parse_program(src)?;
+    
+    // Check if the first form is a macro definition
+    if program.forms.len() != 1 {
+        return Err(vec![Simple::custom(0..1, "Expected a single macro definition")]);
+    }
+    
+    let form = &program.forms[0];
+    match &form.node {
+        TopLevelKind::VarDef { name, value } => {
+            // Check if the value is a macro call
+            if let ExprKind::Call { name: func_name, args } = &value.node {
+                if func_name == "macro" && args.len() >= 2 {
+                    // Extract the parameter names from the first argument
+                    if let ExprKind::Literal(Literal::Tuple(param_exprs)) = &args[0].node {
+                        let params = param_exprs.iter()
+                            .filter_map(|expr| {
+                                if let ExprKind::Symbol(param_name) = &expr.node {
+                                    Some(param_name.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>();
+                        
+                        // Extract the body from the second argument
+                        let body = &args[1];
+                        
+                        // Create a proper MacroDef
+                        return Ok(Located::new(
+                            TopLevelKind::MacroDef {
+                                name: name.clone(),
+                                params,
+                                body: body.clone(),
+                            },
+                            form.span
+                        ));
+                    }
+                }
+            }
+            
+            // If we get here, it wasn't a proper macro definition
+            Err(vec![Simple::custom(0..1, "Expected a macro definition of form (def name (macro [args] body))")])
+        },
+        TopLevelKind::MacroDef { .. } => {
+            // Already a macro definition, just return it
+            Ok(form.clone())
+        },
+        _ => {
+            Err(vec![Simple::custom(0..1, "Expected a macro definition of form (def name (macro [args] body))")])
+        }
     }
 }
 
@@ -1150,16 +1332,40 @@ mod tests {
         let program = parse_program(program_src).unwrap();
         assert_eq!(program.forms.len(), 2);
         
-        // Check the module import
-        if let TopLevelKind::ModuleImport { name, path, .. } = &program.forms[0].node {
+        // Check the variable definition that uses the module
+        if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
             assert_eq!(name, "math");
-            assert_eq!(path, "math.ll");
+            if let ExprKind::Call { name, args } = &value.node {
+                assert_eq!(name, "use");
+                assert_eq!(args.len(), 1);
+                if let ExprKind::Literal(Literal::String(path)) = &args[0].node {
+                    assert_eq!(path, "math.ll");
+                } else {
+                    panic!("Expected String literal, got {:?}", args[0].node);
+                }
+            } else {
+                panic!("Expected Call expression, got {:?}", value.node);
+            }
         } else {
-            panic!("Expected ModuleImport, got {:?}", program.forms[0].node);
+            panic!("Expected VarDef, got {:?}", program.forms[0].node);
         }
         
-        // Just verify we have a second form but don't check its structure for now
-        // This confirms the parser handles the module call syntax
-        println!("Second form: {:?}", program.forms[1].node);
+        // Check the second form is a module call
+        if let TopLevelKind::Expr(expr) = &program.forms[1].node {
+            if let ExprKind::ModuleCall { module, function, args } = expr {
+                assert_eq!(module, "math");
+                assert_eq!(function, "sqrt");
+                assert_eq!(args.len(), 1);
+                if let ExprKind::Literal(Literal::Integer(val)) = &args[0].node {
+                    assert_eq!(*val, 16);
+                } else {
+                    panic!("Expected Integer literal, got {:?}", args[0].node);
+                }
+            } else {
+                panic!("Expected ModuleCall expression, got {:?}", expr);
+            }
+        } else {
+            panic!("Expected Expr, got {:?}", program.forms[1].node);
+        }
     }
 } 

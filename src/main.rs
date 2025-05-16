@@ -3,6 +3,8 @@ use std::env;
 use std::process;
 use lllisp::parser;
 use lllisp::type_inference::TypeInferer;
+use lllisp::macro_expander::MacroExpander;
+use lllisp::alias_folding::AliasFolding;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -18,11 +20,21 @@ fn main() {
         Ok(src) => {
             match parser::parse_program(&src) {
                 Ok(program) => {
-                    println!("Successfully parsed program:");
+                    println!("Successfully parsed program with {} top-level forms", program.forms.len());
+                    
+                    // Apply macro expansion
+                    let mut macro_expander = MacroExpander::new();
+                    let expanded_program = macro_expander.process_program(&program);
+                    println!("Program after macro expansion: {} top-level forms", expanded_program.forms.len());
+                    
+                    // Apply alias folding
+                    let mut alias_folder = AliasFolding::new();
+                    let folded_program = alias_folder.process_program(&expanded_program);
+                    println!("Program after alias folding: {} top-level forms", folded_program.forms.len());
                     
                     // Apply type inference
                     let mut inferer = TypeInferer::new();
-                    match inferer.process_program(&program) {
+                    match inferer.process_program(&folded_program) {
                         Ok(typed_program) => {
                             println!("Successfully type-checked program:");
                             println!("{:#?}", typed_program);
@@ -171,5 +183,29 @@ mod tests {
         } else {
             panic!("Expected VarDef");
         }
+    }
+}
+
+// Utility function to display a form (for debugging)
+fn _display_form(form: &lllisp::TopLevel) {
+    match &form.node {
+        lllisp::TopLevelKind::TypeDef { name, ty } => {
+            println!("TypeDef: {} = {:?}", name, ty);
+        },
+        lllisp::TopLevelKind::VarDef { name, value } => {
+            println!("VarDef: {} = {:?}", name, value.node);
+        },
+        lllisp::TopLevelKind::ModuleImport { name, path, is_header } => {
+            println!("ModuleImport: {} from {} (header: {})", name, path, is_header);
+        },
+        lllisp::TopLevelKind::Expr(expr) => {
+            println!("Expr: {:?}", expr);
+        },
+        lllisp::TopLevelKind::MacroDef { name, params, body } => {
+            println!("MacroDef: {} with {} params", name, params.len());
+        },
+        lllisp::TopLevelKind::Alias { name, module, function } => {
+            println!("Alias: {} -> {}/{}", name, module, function);
+        },
     }
 } 

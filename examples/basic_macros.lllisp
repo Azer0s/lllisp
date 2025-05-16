@@ -1,0 +1,21 @@
+;; ========================================
+;; LLLisp Basic Macro Examples
+;; ========================================
+
+;; Define a simple identity macro
+(def identity (macro [x] x))
+
+;; Define a simple arithmetic macro
+(def double (macro [x] (+ x x)))
+
+;; Define a macro with multiple arguments
+(def mult (macro [x y] (* x y)))
+
+;; Define a rest parameter macro (list constructor)
+(def list (macro [& items] items))
+
+;; Example usages
+(def id-result (identity 42))
+(def double-result (double 7))
+(def mult-result (mult 6 7))
+(def my-list (list 1 2 3 4 5)) 

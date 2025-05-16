@@ -1,12 +1,64 @@
-;; Define a simple when macro
-;; when is like if without an else branch
-(def when (macro [condition body]
-  `(if ~condition ~body null)))
+;; ========================================
+;; LLLisp Macro Examples
+;; ========================================
 
-;; Define an unless macro
-;; unless is like if with the condition negated
-(def unless (macro [condition body]
-  `(if (== ~condition false) ~body null)))
+;; -- Basic Macros --
+
+;; Identity macro - returns its argument unchanged
+(def identity (macro [x] x))
+
+;; Arithmetic macros
+(def double (macro [x] (+ x x)))
+(def mult (macro [x y] (* x y)))
+
+;; Rest parameter macro - collects variable arguments into a tuple
+(def list (macro [& items] items))
+
+;; -- More Complex Macros --
+
+;; Conditional macro - simplified if that returns one of two values
+(def when (macro [condition then-expr]
+  (if condition then-expr null)))
+
+;; Unless macro - inverses the condition
+(def unless (macro [condition else-expr]
+  (if condition null else-expr)))
+
+;; Define a swap macro to exchange two values
+(def swap (macro [a b]
+  (let [temp a]
+    (def a b)
+    (def b temp))))
+
+;; -- Macro Usage Examples --
+
+;; Using the identity macro
+(def id-result (identity 42))
+
+;; Using the double macro
+(def double-result (double 7))
+
+;; Using the multiplication macro
+(def mult-result (mult 6 7))
+
+;; Using the list macro with different numbers of arguments
+(def empty-list (list))
+(def single-item (list 100))
+(def my-list (list 1 2 3 4 5))
+
+;; Using the when macro
+(def when-true (when true "Condition was true"))
+(def when-false (when false "This won't be returned"))
+
+;; Using the unless macro
+(def unless-true (unless true "This won't be returned"))
+(def unless-false (unless false "Condition was false"))
+
+;; Example usages
+(def test-value 10)
+(when (> test-value 5)
+  (printf "test-value is greater than 5: %d\n" test-value)
+  (set test-value (* test-value 2)))
 
 ;; Define an apply macro that applies a function to arguments
 (def apply (macro [func args]
@@ -38,4 +90,13 @@
     (os/when "linux"
       (stdio/printf "Running on Linux\n"))
     (os/when "windows"
-      (stdio/printf "Running on Windows\n"))))) 
+      (stdio/printf "Running on Windows\n")))))
+
+;; Quasiquote macro example
+(def make-adder (macro [n] `(fn [x] i32 (+ x ~n))))
+
+;; Application
+(def result1 (identity 42))
+(def result2 (double 5))
+(def add-five (make-adder 5))
+(def my-list (list 1 2 3)) 

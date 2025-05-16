@@ -1,5 +1,7 @@
 ;; Hello World example for LLLisp
-(cImport "stdio.h")
+(def stdio (use :header "stdio.h"))
+
+(alias printf stdio/printf)
 
 ;; Main function
 (def main (fn [] i32

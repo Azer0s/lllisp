@@ -1,0 +1,55 @@
+;; ========================================
+;; LLLisp Alias Examples
+;; ========================================
+;; This file demonstrates the alias functionality in LLLisp,
+;; which allows creating shorter names for imported module functions
+
+;; 1. Basic module imports
+(def stdio (use :header "stdio.h"))
+(def math (use "math"))
+(def graphics (use "graphics"))
+
+;; 2. Simple aliases
+;; Aliases create shorter names for module functions
+(alias print stdio/printf)    ;; Shorter alias for printf
+(alias sqrt math/sqrt)        ;; Math square root function
+(alias pow math/power)        ;; Math power function
+
+;; 3. Nested module paths with aliases
+;; Aliases can simplify deeply nested module paths
+(alias render-button graphics/ui/button/render)
+(alias draw-text graphics/ui/text/draw)
+
+;; 4. Using the aliases
+;; 4.1 Basic print alias
+(print "Hello, alias world!\n" "")
+
+;; 4.2 Math function aliases
+(def x 16.0)
+(def sq-root (sqrt x))
+(print "Square root of %.1f is: %.2f\n" x sq-root)
+(print "Result squared is: %.2f\n" (pow sq-root 2.0))
+
+;; 4.3 Nested module path aliases
+;; These calls are much cleaner with aliases
+(render-button "Click Me" 100 200 150 50)
+(draw-text "Hello LLLisp!" 120 220 16 0xFFFFFF)
+
+;; 5. Aliases with complex expressions
+;; Aliases can be used in complex expressions
+(def complex-result 
+  (+ (sqrt (pow 3.0 2.0))
+     (pow (sqrt 16.0) 2.0)))
+
+(print "Complex calculation result: %.2f\n" complex-result)
+
+;; 6. Alternative module alias patterns
+;; You can alias multiple functions from the same module
+(def random (use "random"))
+(alias rand random/rand)
+(alias rand-range random/range)
+(alias rand-seed random/seed)
+
+(rand-seed 42)
+(print "Random number: %.2f\n" (rand))
+(print "Random number in range: %d\n" (rand-range 1 100)) 

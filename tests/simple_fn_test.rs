@@ -37,20 +37,29 @@ fn test_if_with_nested_expressions() {
         if let TopLevelKind::VarDef { name, value } = &form.node {
             assert_eq!(name, "max-value");
             if let ExprKind::If { condition, then_branch, else_branch } = &value.node {
-                // Check condition is a Binary expression (>)
-                if let ExprKind::Binary { op, .. } = &condition.node {
-                    // Could check op == BinaryOp::Gt but we'll skip that
-                    assert!(true);
+                // Check condition is a function call to ">"
+                if let ExprKind::Call { name, args } = &condition.node {
+                    assert_eq!(name, ">");
+                    assert_eq!(args.len(), 2);
                 } else {
-                    panic!("Expected Binary expression in condition, got {:?}", condition.node);
+                    panic!("Expected function call to '>' in condition, got {:?}", condition.node);
                 }
                 
-                // Check that the else branch exists and is a Binary expression (*)
+                // Check then branch is a function call to "+"
+                if let ExprKind::Call { name, args } = &then_branch.node {
+                    assert_eq!(name, "+");
+                    assert_eq!(args.len(), 2);
+                } else {
+                    panic!("Expected function call to '+' in then branch, got {:?}", then_branch.node);
+                }
+                
+                // Check that the else branch exists and is a function call to "*"
                 if let Some(else_expr) = else_branch {
-                    if let ExprKind::Binary { .. } = &else_expr.node {
-                        assert!(true);
+                    if let ExprKind::Call { name, args } = &else_expr.node {
+                        assert_eq!(name, "*");
+                        assert_eq!(args.len(), 2);
                     } else {
-                        panic!("Expected Binary expression in else branch, got {:?}", else_expr.node);
+                        panic!("Expected function call to '*' in else branch, got {:?}", else_expr.node);
                     }
                 } else {
                     panic!("Expected else branch");
@@ -83,11 +92,11 @@ fn test_if_without_else() {
                 assert_eq!(args.len(), 2, "If without else should have 2 arguments");
                 
                 // First arg should be the condition
-                if let ExprKind::Binary { op, .. } = &args[0].node {
-                    // Check that the condition is a binary expression
-                    assert!(true);
+                if let ExprKind::Call { name, args: cond_args } = &args[0].node {
+                    assert_eq!(name, ">");
+                    assert_eq!(cond_args.len(), 2);
                 } else {
-                    panic!("Expected Binary expression in condition, got {:?}", args[0].node);
+                    panic!("Expected function call to '>' in condition, got {:?}", args[0].node);
                 }
             } else {
                 panic!("Expected Call expression for if without else, got {:?}", value.node);

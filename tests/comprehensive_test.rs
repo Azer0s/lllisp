@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{Type, TopLevelKind, ExprKind, Literal, BinaryOp},
+    ast::{Type, TopLevelKind, ExprKind, Literal},
     parser::parse_program,
     type_inference::TypeInferer,
 };
@@ -216,16 +216,17 @@ fn assert_tuple_var(form: &lllisp::ast::TopLevel, expected_name: &str, expected_
     }
 }
 
-fn assert_binary_op(form: &lllisp::ast::TopLevel, expected_name: &str, expected_op: BinaryOp) {
+/// Assert that a top-level binding is a function call with an operator
+fn assert_binary_op(form: &lllisp::ast::TopLevel, expected_name: &str, expected_op: &str) {
     match &form.node {
         TopLevelKind::VarDef { name, value } => {
             assert_eq!(name, expected_name);
             match &value.node {
-                ExprKind::Binary { op, .. } => {
-                    assert_eq!(*op, expected_op);
+                ExprKind::Call { name, .. } => {
+                    assert_eq!(name, expected_op);
                 },
                 _ => {
-                    println!("Warning: Variable {} is not a direct Binary operation", expected_name);
+                    println!("Warning: Variable {} is not a direct function call to operator {}", expected_name, expected_op);
                 }
             }
         },
