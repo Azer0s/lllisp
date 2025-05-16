@@ -4,7 +4,7 @@
 //! It processes the AST after parsing but before type inference.
 
 use std::collections::HashMap;
-use crate::ast::{Program, TopLevel, TopLevelKind, Expr, ExprKind, Located, Span};
+use crate::ast::{Program, TopLevel, TopLevelKind, Expr, ExprKind, Located};
 
 /// Represents the alias folding pass
 pub struct AliasFolding {
@@ -67,7 +67,7 @@ impl AliasFolding {
     /// Process a top-level form
     fn process_top_level(&self, form: &TopLevel) -> TopLevel {
         match &form.node {
-            TopLevelKind::TypeDef { name, ty } => {
+            TopLevelKind::TypeDef { name: _, ty: _ } => {
                 // Type definitions don't contain expressions, so we can return them as is
                 form.clone()
             },
@@ -84,7 +84,7 @@ impl AliasFolding {
                     form.span,
                 )
             },
-            TopLevelKind::ModuleImport { name, path, is_header } => {
+            TopLevelKind::ModuleImport { name: _, path: _, is_header: _ } => {
                 // Module imports don't contain expressions, so we can return them as is
                 form.clone()
             },
@@ -128,7 +128,7 @@ impl AliasFolding {
     /// Process an expression kind
     fn process_expr_kind(&self, expr_kind: &ExprKind) -> ExprKind {
         match expr_kind {
-            ExprKind::Literal(literal) => {
+            ExprKind::Literal(_literal) => {
                 // Literals don't need processing
                 expr_kind.clone()
             },
@@ -319,19 +319,19 @@ impl AliasFolding {
                 
                 ExprKind::Return(Box::new(processed_value))
             },
-            ExprKind::Quote(inner) => {
+            ExprKind::Quote(_inner) => {
                 // We don't process the body of a quoted expression
                 expr_kind.clone()
             },
-            ExprKind::Unquote(inner) => {
+            ExprKind::Unquote(_inner) => {
                 // We don't process unquote expressions
                 expr_kind.clone()
             },
-            ExprKind::UnquoteSplicing(inner) => {
+            ExprKind::UnquoteSplicing(_inner) => {
                 // We don't process unquote-splicing expressions
                 expr_kind.clone()
             },
-            ExprKind::QuasiQuote(inner) => {
+            ExprKind::QuasiQuote(_inner) => {
                 // We don't process quasi-quote expressions
                 expr_kind.clone()
             },

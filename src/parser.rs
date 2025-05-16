@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use std::ops::Range;
 
 use crate::ast::{
-    ExprKind, Literal, Program, Span, TopLevel, TopLevelKind, Type, Located, Pattern, ForIterator, MatchCase
+    ExprKind, Literal, Program, Span, TopLevel, TopLevelKind, Type, Located, MatchCase
 };
 
 // Parse a complete LLLisp program
@@ -479,7 +479,7 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
         let symbol = ident().map(|name| Located::new(ExprKind::Symbol(name), Span::new(0, 0)));
         
         // Macro parameter list: [param1 param2 ...]
-        let macro_param_list = just('[')
+        let _macro_param_list = just('[')
             .then(ident().padded().repeated())
             .then(just(']'))
             .map_with_span(|((_, params), _), span: Range<usize>| {
@@ -674,7 +674,7 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
                     println!("Found macro call, checking for parameter list");
                     
                     // Parse the args for macro parameters and body
-                    if let Some(body) = args.get(1) {
+                    if let Some(_body) = args.get(1) {
                         println!("Parsed macro call with parameter list and body");
                     }
                 }
@@ -832,7 +832,7 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
         let unquote = just('~')
             .then(just('@').or_not())
             .then(expr.clone())
-            .map(|((tilde, at), e)| {
+            .map(|((_tilde, at), e)| {
                 if at.is_some() {
                     ExprKind::UnquoteSplicing(Box::new(e))
                 } else {
@@ -883,7 +883,7 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
         });
         
         // Match case: pattern result
-        let match_case = pattern.clone()
+        let _match_case = pattern.clone()
             .then(expr.clone())
             .map(|(pattern, result)| MatchCase { pattern, result });
             

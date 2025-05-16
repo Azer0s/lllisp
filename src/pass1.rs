@@ -9,7 +9,7 @@
 /// 5. Makes implicit returns explicit by adding Return nodes
 
 use std::collections::{HashMap, HashSet};
-use crate::ast::{Program, TopLevel, TopLevelKind, Type, Expr, ExprKind, Located, Span, Literal};
+use crate::ast::{Program, TopLevel, TopLevelKind, Type, Expr, ExprKind, Located, Span};
 
 /// Represents a monomorphized type with a unique name
 #[derive(Debug, Clone)]

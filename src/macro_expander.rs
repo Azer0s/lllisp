@@ -141,7 +141,7 @@ impl MacroExpander {
             },
             ExprKind::Call { name, args } => {
                 // Check if this is a macro call
-                if let Some(macro_def) = self.macros.get(name) {
+                if let Some(_macro_def) = self.macros.get(name) {
                     println!("Found macro call to '{}'", name);
                     
                     // Process the arguments first (but don't expand macros within them)
@@ -311,7 +311,7 @@ impl MacroExpander {
                 
                 ExprKind::Return(Box::new(processed_value))
             },
-            ExprKind::Quote(inner) => {
+            ExprKind::Quote(_inner) => {
                 // We don't process the inner expression of a quote
                 expr_kind.clone()
             },
@@ -354,7 +354,7 @@ impl MacroExpander {
                 println!("Processed unquote: {:?}", result);
                 result
             },
-            ExprKind::UnquoteSplicing(inner) => {
+            ExprKind::UnquoteSplicing(_inner) => {
                 println!("Found unquote-splicing at top level of quasi-quote");
                 // Unquote-splicing not valid at top level of quasi-quote
                 // Just keep it as is

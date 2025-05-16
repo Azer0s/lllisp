@@ -207,7 +207,7 @@ impl Interpreter {
                 self.env.define(name.clone(), val.clone());
                 Ok(val)
             },
-            TopLevelKind::TypeDef { name, ty } => {
+            TopLevelKind::TypeDef { name, ty: _ } => {
                 // Register the type name in the environment
                 // For the interpreter, we just need to know it's a type
                 self.env.define(name.clone(), Value::Expression(Box::new(Located::new(

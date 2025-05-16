@@ -7,7 +7,7 @@
 /// 4. Empty blocks and unnecessary nesting
 
 use std::collections::{HashMap, HashSet};
-use crate::ast::{Program, TopLevel, TopLevelKind, Expr, ExprKind, Located, Span, Literal};
+use crate::ast::{Program, TopLevel, TopLevelKind, Expr, ExprKind, Located, Literal};
 
 /// Dead code elimination pass
 pub struct DeadCodeElimination {
@@ -224,7 +224,7 @@ impl DeadCodeElimination {
             ExprKind::QuasiQuote(inner) => {
                 self.collect_expr_variable_usages_into(inner, usages);
             },
-            ExprKind::Binary { op, left, right } => {
+            ExprKind::Binary { op: _, left, right } => {
                 self.collect_expr_variable_usages_into(left, usages);
                 self.collect_expr_variable_usages_into(right, usages);
             },
@@ -354,7 +354,7 @@ impl DeadCodeElimination {
                     form.span,
                 )
             },
-            TopLevelKind::Alias { name, module, function } => {
+            TopLevelKind::Alias { name, module: _, function: _ } => {
                 // Only add used alias definitions or keep all if keep_all is true
                 if self.used_variables.contains(name) {
                     // Process the alias definition
@@ -370,11 +370,11 @@ impl DeadCodeElimination {
     /// Process an expression to eliminate dead code within it
     fn process_expr(&mut self, expr: &Expr) -> Expr {
         match &expr.node {
-            ExprKind::Symbol(name) => {
+            ExprKind::Symbol(_name) => {
                 // Symbol nodes are unchanged
                 expr.clone()
             },
-            ExprKind::Literal(lit) => {
+            ExprKind::Literal(_lit) => {
                 // Literal nodes are unchanged
                 expr.clone()
             },

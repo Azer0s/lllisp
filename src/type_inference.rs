@@ -462,14 +462,14 @@ impl TypeInferer {
                     form.span,
                 ))
             },
-            TopLevelKind::MacroDef { name, params, body } => {
+            TopLevelKind::MacroDef { name: _, params: _, body: _ } => {
                 // For now, we don't do much type checking on macros
                 // In a full implementation, we would analyze the macro body
                 
                 // Return the macro definition unchanged
                 Ok(form.clone())
             },
-            TopLevelKind::Alias { name, module, function } => {
+            TopLevelKind::Alias { name: _, module: _, function: _ } => {
                 // Aliases should be handled by alias folding before type inference
                 // If we see one, just pass it through unchanged
                 Ok(form.clone())
@@ -481,7 +481,7 @@ impl TypeInferer {
     fn infer_expr_type(&mut self, expr: &Expr) -> Result<Expr, TypeError> {
         match &expr.node {
             ExprKind::Literal(literal) => {
-                let ty = self.infer_literal_type(literal);
+                let _ty = self.infer_literal_type(literal);
                 Ok(expr.clone())
             },
             ExprKind::Symbol(name) => {
@@ -526,7 +526,7 @@ impl TypeInferer {
                 match resolved_type {
                     Type::Struct(fields) => {
                         // Find the field in the struct
-                        if let Some((_, field_type)) = fields.iter().find(|(name, _)| name == field) {
+                        if let Some((_, _field_type)) = fields.iter().find(|(name, _)| name == field) {
                             Ok(Located::new(
                                 ExprKind::FieldAccess {
                                     object: Box::new(processed_object),
@@ -941,7 +941,7 @@ impl TypeInferer {
             ExprKind::Return(ref value) => {
                 // Process the returned value
                 let processed_value = self.infer_expr_type(value)?;
-                let value_type = self.infer_type_from_expr(&processed_value)?;
+                let _value_type = self.infer_type_from_expr(&processed_value)?;
                 
                 // Return expression has the same type as its value
                 Ok(Located::new(
@@ -949,23 +949,23 @@ impl TypeInferer {
                     expr.span
                 ))
             },
-            ExprKind::Quote(inner) => {
+            ExprKind::Quote(_inner) => {
                 // Quoted expressions are not evaluated, so we don't need to check their types
                 Ok(expr.clone())
             },
-            ExprKind::Unquote(inner) => {
+            ExprKind::Unquote(_inner) => {
                 // Unquoted expressions should only appear inside quasi-quotes
                 // This is a syntax error that should be caught by the parser
                 // For type inference, we'll just pass it through
                 Ok(expr.clone())
             },
-            ExprKind::UnquoteSplicing(inner) => {
+            ExprKind::UnquoteSplicing(_inner) => {
                 // Unquote-splicing expressions should only appear inside quasi-quotes
                 // This is a syntax error that should be caught by the parser
                 // For type inference, we'll just pass it through
                 Ok(expr.clone())
             },
-            ExprKind::QuasiQuote(inner) => {
+            ExprKind::QuasiQuote(_inner) => {
                 // We don't deeply check quasi-quoted expressions
                 Ok(expr.clone())
             },
@@ -1321,7 +1321,7 @@ impl TypeInferer {
                 // Type check operations always return a boolean
                 Ok(Type::Bool)
             },
-            ExprKind::ModuleCall { module: _, function: _, args } => {
+            ExprKind::ModuleCall { module: _, function: _, args: _ } => {
                 // For now, we'll assume module calls return a generic "any" type
                 // In a more advanced implementation, we would look up the function's return type from the module
                 Ok(Type::Named("any".to_string()))
@@ -1348,10 +1348,10 @@ impl TypeInferer {
                 // For now, we just return a generic type for quasiquoted expressions
                 Ok(Type::Named("any".to_string()))
             },
-            ExprKind::Binary { op, left, right } => {
+            ExprKind::Binary { op: _, left, right } => {
                 // Infer types for both operands
                 let left_type = self.infer_type_from_expr(left)?;
-                let right_type = self.infer_type_from_expr(right)?;
+                let _right_type = self.infer_type_from_expr(right)?;
                 
                 // For now, assume binary operations result in the same type as the left operand
                 Ok(left_type)
