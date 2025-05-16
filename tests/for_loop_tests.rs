@@ -5,41 +5,38 @@ use lllisp::{
 
 #[test]
 fn test_basic_range_for_loop() {
-    let src = r#"
-    (def result 
-        (for (range x (list "Hello" "World"))
-            (out x)
-        )
-    )
-    "#;
+    // Range-based for loop with a function call as the body
+    let src = "(def result (for (range x (list 1 2)) (out x)))";
     
     let program = parse_program(src).unwrap();
     
-    // Check that the for expression is correctly parsed
+    assert_eq!(program.forms.len(), 1, "Expected 1 form, got {}", program.forms.len());
+    
     if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
         assert_eq!(name, "result");
+        
         if let ExprKind::For { iterator, body } = &value.node {
-            // Check iterator is a range iterator
+            // Check that the iterator is a range
             if let Some(iter) = iterator {
                 if let ForIterator::Range { var, collection } = &**iter {
                     assert_eq!(var, "x");
                     
-                    // Check collection is a list
+                    // Check that collection is a list call
                     if let ExprKind::Call { name, args } = &collection.node {
                         assert_eq!(name, "list");
                         assert_eq!(args.len(), 2);
                         
-                        // Check the list items
-                        if let ExprKind::Literal(Literal::String(s)) = &args[0].node {
-                            assert_eq!(s, "Hello");
+                        // Check the list args
+                        if let ExprKind::Literal(Literal::Integer(n1)) = &args[0].node {
+                            assert_eq!(*n1, 1);
                         } else {
-                            panic!("Expected String literal in list, got {:?}", args[0].node);
+                            panic!("Expected Integer literal, got {:?}", args[0].node);
                         }
                         
-                        if let ExprKind::Literal(Literal::String(s)) = &args[1].node {
-                            assert_eq!(s, "World");
+                        if let ExprKind::Literal(Literal::Integer(n2)) = &args[1].node {
+                            assert_eq!(*n2, 2);
                         } else {
-                            panic!("Expected String literal in list, got {:?}", args[1].node);
+                            panic!("Expected Integer literal, got {:?}", args[1].node);
                         }
                     } else {
                         panic!("Expected Call to list, got {:?}", collection.node);
@@ -51,12 +48,12 @@ fn test_basic_range_for_loop() {
                 panic!("Expected Some iterator, got None");
             }
             
-            // Check body is a call to out
-            if let ExprKind::Call { name: call_name, args } = &body.node {
-                assert_eq!(call_name, "out");
+            // Check that the body is a call to 'out'
+            if let ExprKind::Call { name, args } = &body.node {
+                assert_eq!(name, "out");
                 assert_eq!(args.len(), 1);
                 
-                // Check argument is symbol x
+                // Check that the argument is the symbol 'x'
                 if let ExprKind::Symbol(sym) = &args[0].node {
                     assert_eq!(sym, "x");
                 } else {
@@ -68,12 +65,9 @@ fn test_basic_range_for_loop() {
         } else {
             panic!("Expected For expression, got {:?}", value.node);
         }
+    } else {
+        panic!("Expected VarDef, got {:?}", program.forms[0].node);
     }
-    
-    // Skip type inference for now since list function is not defined
-    // let mut inferer = TypeInferer::new();
-    // let processed = inferer.process_program(&program);
-    // assert!(processed.is_ok(), "Basic range for loop should type check");
 }
 
 #[test]

@@ -1,8 +1,80 @@
+;; ========================================
+;; LLLisp Comprehensive Macros Example
+;; ========================================
+
+;; -- Basic Macros --
+
+;; Identity macro - returns its argument unchanged
 (def identity (macro [x] x))
+
+;; Double macro - multiplies its argument by 2
 (def double (macro [x] (+ x x)))
+
+;; Multiplication macro - multiplies two arguments
 (def mult (macro [x y] (* x y)))
+
+;; List construction macro with rest args
 (def list (macro [& items] items))
+
+;; -- Control Flow Macros --
+
+;; When macro - conditional execution when condition is true
+(def when (macro [condition then-expr]
+  (if condition then-expr null)))
+
+;; Unless macro - conditional execution when condition is false
+(def unless (macro [condition else-expr]
+  (if condition null else-expr)))
+
+;; -- Quasiquoting & Unquoting --
+
+;; Function generator macro
+(def make-adder (macro [n] 
+  `(fn [x] i32 
+     (+ x ~n))))
+
+;; Simple debugging macro
+(def debug (macro [msg]
+  `(stdio/printf "DEBUG: %s\n" ~msg)))
+
+;; -- OS-specific Macros --
+
+;; OS-specific code
+(def os-when (macro [os-name & body]
+  `(if (= (system/os) ~os-name)
+       (do ~@body)
+       null)))
+
+;; -- Usage Examples --
+
+;; Using the identity macro
 (def result1 (identity 42))
+
+;; Using the double macro
 (def result2 (double 7))
+
+;; Using the multiplication macro
 (def result3 (mult 6 7))
-(def result4 (list 1 2 3 4 5)) 
+
+;; Using the list macro
+(def result4 (list 1 2 3 4 5))
+
+;; Using when macro
+(def x 10)
+(when (> x 5)
+  (def result5 "x is greater than 5"))
+
+;; Using unless macro
+(unless (< x 5)
+  (def result6 "x is not less than 5"))
+
+;; Using the make-adder macro
+(def add-five (make-adder 5))
+(def result7 (add-five 10))
+
+;; Using OS-specific macro
+(os-when "darwin"
+  (def result8 "Running on macOS"))
+
+;; Using debug macro
+(debug "Testing comprehensive macros") 

@@ -51,6 +51,16 @@ pub fn parse_program(src: &str) -> Result<Program, Vec<Simple<char>>> {
     
     // Preprocess the source to standardize
     let preprocessed = preprocess_source(src);
+    println!("Preprocessed source: '{}'", preprocessed);
+    
+    // Test each parser individually to identify the issue
+    let input = preprocessed.as_str();
+    println!("Trying var_def parser:");
+    let var_def_result = var_def_parser().parse(input);
+    match &var_def_result {
+        Ok(result) => println!("  Success: {:?}", result.node),
+        Err(e) => println!("  Error: {:?}", e),
+    }
     
     // Parse the program
     match top_level_parser().parse(preprocessed.as_str()) {
@@ -64,7 +74,10 @@ pub fn parse_program(src: &str) -> Result<Program, Vec<Simple<char>>> {
             
             Ok(Program { forms: transformed_forms })
         }
-        Err(e) => Err(e),
+        Err(e) => {
+            println!("Error parsing program: {:?}", e);
+            Err(e)
+        },
     }
 }
 
@@ -96,7 +109,23 @@ fn preprocess_source(src: &str) -> String {
         result.push(' ');
     }
     
-    result.trim().to_string()
+    // Remove multiple consecutive spaces
+    let mut normalized = String::new();
+    let mut last_was_space = false;
+    
+    for c in result.chars() {
+        if c.is_whitespace() {
+            if !last_was_space {
+                normalized.push(' ');
+                last_was_space = true;
+            }
+        } else {
+            normalized.push(c);
+            last_was_space = false;
+        }
+    }
+    
+    normalized.trim().to_string()
 }
 
 // Main top-level parser
@@ -192,10 +221,13 @@ fn top_level_parser() -> impl Parser<char, Vec<TopLevel>, Error = Simple<char>> 
     let var_def = just('(')
         .then(just("def").padded())
         .then(ident())
-        .then(expr_parser())
+        .then(expr_parser().map_with_span(|expr, span| {
+            println!("Variable definition value expression: {:?}", expr.node);
+            Located::new(expr.node, Span::new(span.start, span.end))
+        }))
         .then(just(')'))
         .map(|((((_, _), name), value), _)| {
-            println!("Parsing var_def for: {}", name);
+            println!("Parsing var_def for: {} with value type: {:?}", name, value.node);
             // Check if this is a macro definition
             if let ExprKind::Call { name: call_name, args } = &value.node {
                 println!("Checking if {} is a macro definition", name);
@@ -292,6 +324,31 @@ fn top_level_parser() -> impl Parser<char, Vec<TopLevel>, Error = Simple<char>> 
         })
         .labelled("alias definition");
 
+    // Export statement: (export symbol1 symbol2 ...) or (export :all)
+    let export_stmt = just('(')
+        .then(just("export").padded())
+        .then(
+            // Handle :all special case
+            just(':')
+            .then(just("all").padded())
+            .map(|_| (vec![], true)) // No symbols, export_all = true
+            .or(
+                // Handle individual symbol exports
+                ident().padded()
+                .repeated()
+                .map(|symbols| (symbols, false)) // Symbol list, export_all = false
+            )
+        )
+        .then(just(')'))
+        .map(|(((_, _), (symbols, export_all)), _)| {
+            println!("Parsed export statement: export_all={}, symbols={:?}", export_all, symbols);
+            TopLevelKind::Export { symbols, export_all }
+        })
+        .map_with_span(|kind, span: Range<usize>| {
+            Located::new(kind, Span::new(span.start, span.end))
+        })
+        .labelled("export statement");
+
     // Combine all top-level forms
     choice((
         type_def.labelled("type definition"),
@@ -299,37 +356,19 @@ fn top_level_parser() -> impl Parser<char, Vec<TopLevel>, Error = Simple<char>> 
         module_import.labelled("module import"),
         alias_def.labelled("alias definition"),
         top_level_module_call.labelled("module function call"),
-        
-        // Export statement: (export symbol1 symbol2 ...) or (export :all)
-        just('(')
-            .then(just("export").padded())
-            .then(
-                // Handle :all special case
-                just(':')
-                .then(just("all").padded())
-                .map(|_| (vec![], true)) // No symbols, export_all = true
-                .or(
-                    // Handle individual symbol exports
-                    ident().padded()
-                    .repeated()
-                    .map(|symbols| (symbols, false)) // Symbol list, export_all = false
-                )
-            )
-            .then(just(')'))
-            .map(|(((_, _), (symbols, export_all)), _)| {
-                println!("Parsed export statement: export_all={}, symbols={:?}", export_all, symbols);
-                TopLevelKind::Export { symbols, export_all }
-            })
-            .map_with_span(|kind, span: Range<usize>| {
-                Located::new(kind, Span::new(span.start, span.end))
-            })
-            .labelled("export statement"),
-            
+        export_stmt,
         expr_form.labelled("expression"),
     ))
     .padded()
     .repeated()
     .collect()
+    .map(|forms: Vec<TopLevel>| {
+        println!("Collected {} forms in top_level_parser", forms.len());
+        for (i, form) in forms.iter().enumerate() {
+            println!("Form {}: {:?}", i, form.node);
+        }
+        forms
+    })
 }
 
 // Identifier parser - alphanumeric plus some special characters
@@ -696,6 +735,7 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
                         .then(expr.clone())
                         .then(just(')'))
                         .map(|((((_, _), var), collection), _)| {
+                            println!("Parsed range iterator with var: {}", var);
                             Some(Box::new(crate::ast::ForIterator::Range {
                                 var,
                                 collection,
@@ -704,13 +744,18 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
                     
                     // Plain condition (like a while loop)
                     expr.clone().map(|condition| {
+                        println!("Parsed condition iterator");
                         Some(Box::new(crate::ast::ForIterator::Condition(condition)))
                     }),
                 ))
             )
-            .then(expr.clone()) // Loop body
+            .then(expr.clone().map_with_span(|expr, span| {
+                println!("FOR LOOP BODY: {:?}", expr.node);
+                Located::new(expr.node, Span::new(span.start, span.end))
+            })) // Loop body
             .then(just(')'))
             .map_with_span(|((((_l, _for), iterator), body), _r), span: Range<usize>| {
+                println!("Successfully parsed for loop with body: {:?}", body.node);
                 Located::new(
                     ExprKind::For {
                         iterator,
@@ -755,10 +800,14 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
 
         // Function call: (name arg1 arg2...)
         let fn_call = just('(')
-            .then(ident())
+            .then(ident().map(|name| { 
+                println!("Function call: {}", name);
+                name 
+            }))
             .then(expr.clone().repeated())
             .then(just(')'))
             .map_with_span(|(((_, name), args), _), span: Range<usize>| {
+                println!("Parsed function call: {} with {} args", name, args.len());
                 // Check if it's a module call (contains a slash)
                 if let Some(slash_pos) = name.rfind('/') {
                     let module = name[..slash_pos].to_string();
@@ -1228,6 +1277,25 @@ pub fn parse_macro_definition(src: &str) -> Result<TopLevel, Vec<Simple<char>>> 
     }
 }
 
+// Separate var_def parser for testing
+fn var_def_parser() -> impl Parser<char, TopLevel, Error = Simple<char>> {
+    just('(')
+        .then(just("def").padded())
+        .then(ident())
+        .then(expr_parser().map_with_span(|expr, span| {
+            println!("Variable definition value expression: {:?}", expr.node);
+            Located::new(expr.node, Span::new(span.start, span.end))
+        }))
+        .then(just(')'))
+        .map(|((((_, _), name), value), _)| {
+            println!("Parsing var_def for: {} with value type: {:?}", name, value.node);
+            TopLevelKind::VarDef { name, value }
+        })
+        .map_with_span(|kind, span: Range<usize>| {
+            Located::new(kind, Span::new(span.start, span.end))
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1478,6 +1546,42 @@ mod tests {
             assert_eq!(export_all, true);
         } else {
             panic!("Expected Export, got {:?}", result.node);
+        }
+    }
+
+    // Add a test for the for loop directly in the parser
+    #[test]
+    fn test_for_loop_parsing() {
+        let src = r#"
+        (for (range x (list "Hello" "World"))
+            (out x)
+        )
+        "#;
+        
+        // Parse it as an expression using expr_parser
+        let result = expr_parser().parse(preprocess_source(src).as_str());
+        assert!(result.is_ok(), "Failed to parse for loop: {:?}", result.err());
+        
+        let expr = result.unwrap();
+        if let ExprKind::For { iterator, body } = &expr.node {
+            assert!(iterator.is_some(), "Iterator should not be None");
+            if let Some(iter) = iterator {
+                if let crate::ast::ForIterator::Range { var, collection } = &**iter {
+                    assert_eq!(var, "x");
+                    if let ExprKind::Call { name, args } = &collection.node {
+                        assert_eq!(name, "list");
+                        assert_eq!(args.len(), 2);
+                        assert!(matches!(&args[0].node, ExprKind::Literal(Literal::String(s)) if s == "Hello"));
+                        assert!(matches!(&args[1].node, ExprKind::Literal(Literal::String(s)) if s == "World"));
+                    } else {
+                        panic!("Expected Call, got {:?}", collection.node);
+                    }
+                } else {
+                    panic!("Expected Range iterator, got {:?}", iter);
+                }
+            }
+        } else {
+            panic!("Expected For, got {:?}", expr.node);
         }
     }
 } 

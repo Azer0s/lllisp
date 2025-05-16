@@ -274,12 +274,8 @@ For more complex macros, you might want to generate unique symbols to ensure hyg
     `(do
        (def ,lock-var ,lock)
        (lock/acquire ,lock-var)
-       (try
-         (do ,@body)
-         (finally
-           (lock/release ,lock-var)
-         )
-       )
+       (do ,@body)
+       (lock/release ,lock-var)
      )
   )
 ))

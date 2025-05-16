@@ -80,7 +80,11 @@ LLLisp includes several compiler passes for optimization:
 
 1. **Dead Code Elimination** - Removes unreachable code after return statements, eliminates unused variable definitions, and performs constant folding.
 
-2. **External Function Mapping** - Uses libclang to parse C header files and extract function signatures for proper C interoperability.
+2. **Type Inference** - Infers types for all variables and expressions, ensuring type safety and enabling optimizations.
+
+3. **Constant Folding** - Evaluates constant expressions at compile time, reducing runtime overhead.
+
+4. **External Function Mapping** - Uses libclang to parse C header files and extract function signatures for proper C interoperability.
 
 ## License
 
