@@ -1,0 +1,21 @@
+;; Basic Macro Test
+
+;; Identity macro - returns its argument unchanged
+(def identity (macro [x] x))
+
+;; Double macro - returns its argument doubled
+(def double (macro [x] (+ x x)))
+
+;; Define a variable
+(def test-value 42)
+
+;; Use the identity macro
+(def id-result (identity test-value))
+
+;; Use the double macro
+(def double-result (double test-value))
+
+;; Print the results
+(printf "Original value: %d\n" test-value)
+(printf "Identity result: %d\n" id-result)
+(printf "Double result: %d\n" double-result) 

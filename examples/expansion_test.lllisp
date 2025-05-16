@@ -1,0 +1,10 @@
+;; Simple macro expansion test
+
+;; Define a simple macro
+(def double (macro [x] (+ x x)))
+
+;; Use the macro in a variable definition
+(def result (double 42))
+
+;; Print the result
+(printf "Double of 42 is: %d\n" result) 
