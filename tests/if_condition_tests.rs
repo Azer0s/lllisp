@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{ExprKind, Literal, TopLevelKind},
+    ast::{ExprKind, TopLevelKind},
     parser::{parse_program},
     type_inference::{TypeInferer},
 };
@@ -85,7 +85,7 @@ fn test_if_with_do_blocks() {
     // Check that the if expression is correctly parsed
     if let TopLevelKind::VarDef { name, value } = &program.forms[2].node {
         assert_eq!(name, "result");
-        if let ExprKind::If { condition, then_branch, else_branch } = &value.node {
+        if let ExprKind::If { condition: _, then_branch, else_branch } = &value.node {
             // Check then branch is a do block
             if let ExprKind::Do(exprs) = &then_branch.node {
                 assert_eq!(exprs.len(), 2);
@@ -137,7 +137,7 @@ fn test_if_without_else() {
                 assert_eq!(args.len(), 2);
                 println!("If without else parsed as Call, which is expected");
             },
-            ExprKind::If { condition, then_branch, else_branch } => {
+            ExprKind::If { condition: _, then_branch: _, else_branch } => {
                 // If it's parsed as If, then make sure the condition and then_branch are correct
                 assert!(else_branch.is_none(), "Expected no else branch");
                 println!("If without else parsed as If with None else_branch");

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod macro_minimal_tests {
-    use lllisp::ast::{Expr, ExprKind, Literal, Located, Span, TopLevel, TopLevelKind, Program};
+    use lllisp::ast::{ExprKind, Literal, Located, Span, TopLevel, TopLevelKind, Program};
     use lllisp::macro_expander::MacroExpander;
-    use lllisp::interpreter::Interpreter;
+    
 
     #[test]
     fn test_identity_macro() {

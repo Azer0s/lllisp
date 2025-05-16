@@ -1,7 +1,6 @@
 use lllisp::{
     ast::{ExprKind, ForIterator, Literal, TopLevelKind},
     parser::{parse_program},
-    type_inference::{TypeInferer},
 };
 
 #[test]
@@ -92,7 +91,7 @@ fn test_range_for_loop_with_to_function() {
     // Check that the for expression is correctly parsed
     if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
         assert_eq!(name, "result");
-        if let ExprKind::For { iterator, body } = &value.node {
+        if let ExprKind::For { iterator, body: _ } = &value.node {
             // Check iterator is a range iterator
             if let Some(iter) = iterator {
                 if let ForIterator::Range { var, collection } = &**iter {

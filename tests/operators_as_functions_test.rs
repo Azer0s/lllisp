@@ -82,7 +82,7 @@ fn test_comparison_operators() {
     
     // Run type inference on the program
     let mut type_inferer = TypeInferer::new();
-    let processed_program = type_inferer.process_program(&program).unwrap();
+    let _processed_program = type_inferer.process_program(&program).unwrap();
     
     // Verify the types of comparison operations - we don't need to manually check types
     // since the TypeInferer already did the type checking for us

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod macro_parser_tests {
     use lllisp::parser::parse_form;
-    use lllisp::ast::{TopLevelKind, ExprKind, Located, Span};
+    use lllisp::ast::{TopLevelKind, ExprKind};
 
     #[test]
     fn test_parse_identity_macro() {

@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{Program, TopLevel, TopLevelKind, Type},
+    ast::{Type},
     parser::parse_program,
     external_functions::ExternalFunctionPass,
 };

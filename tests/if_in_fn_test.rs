@@ -13,7 +13,7 @@ fn test_if_in_var_def() {
     
     if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
         assert_eq!(name, "max-value");
-        if let ExprKind::If { condition, then_branch, else_branch } = &value.node {
+        if let ExprKind::If { condition, then_branch: _, else_branch } = &value.node {
             // Verify condition is a function call
             if let ExprKind::Call { name, args } = &condition.node {
                 assert_eq!(name, ">");

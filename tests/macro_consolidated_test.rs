@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod macro_consolidated_tests {
-    use lllisp::ast::{ExprKind, Literal, Located, Span, Program, TopLevel, TopLevelKind};
+    use lllisp::ast::{ExprKind, Literal, Located, Span, TopLevelKind};
     use lllisp::parser::parse_program;
     use lllisp::macro_expander::MacroExpander;
     use lllisp::interpreter::{Interpreter, Value};

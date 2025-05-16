@@ -1,4 +1,4 @@
-use lllisp::ast::{TopLevelKind, ExprKind};
+use lllisp::ast::{TopLevelKind};
 use lllisp::parser::parse_program;
 use lllisp::type_inference::TypeInferer;
 use std::fs;

@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{ExprKind, TopLevelKind, Type},
+    ast::{ExprKind, TopLevelKind},
     parser::{parse_program},
 };
 

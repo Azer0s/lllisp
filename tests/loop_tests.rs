@@ -1,8 +1,8 @@
 use lllisp::{
     ast::{ExprKind, TopLevelKind, ForIterator},
-    parser::{parse_program, expr_parser},
+    parser::{parse_program},
 };
-use chumsky::Parser;
+
 
 #[test]
 fn test_infinite_for_loop() {
@@ -20,7 +20,7 @@ fn test_infinite_for_loop() {
             if let Some(iter) = iterator {
                 if let ForIterator::Condition(condition) = &**iter {
                     // Condition should be a literal "true"
-                    if let ExprKind::Literal(lit) = &condition.node {
+                    if let ExprKind::Literal(_lit) = &condition.node {
                         assert!(true, "Condition is a literal");
                     } else {
                         panic!("Expected Literal for condition, got: {:?}", condition.node);
@@ -110,7 +110,7 @@ fn test_numeric_range_for_loop() {
     if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
         assert_eq!(name, "count-to-ten");
         
-        if let ExprKind::For { iterator, body } = &value.node {
+        if let ExprKind::For { iterator, body: _ } = &value.node {
             // Should have a range iterator
             if let Some(iter) = iterator {
                 if let ForIterator::Range { var, collection } = &**iter {

@@ -13,7 +13,7 @@ fn test_basic_if_expression() {
     if let Some(form) = program.forms.first() {
         if let TopLevelKind::VarDef { name, value } = &form.node {
             assert_eq!(name, "result");
-            if let ExprKind::If { condition, then_branch, else_branch } = &value.node {
+            if let ExprKind::If { condition: _, then_branch: _, else_branch } = &value.node {
                 assert!(else_branch.is_some(), "If should have an else branch");
             } else {
                 panic!("Expected If expression, got {:?}", value.node);

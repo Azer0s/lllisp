@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{ExprKind, TopLevelKind, Literal, Type},
+    ast::{ExprKind, TopLevelKind, Literal},
     parser::parse_program,
     alias_folding::AliasFolding,
     type_inference::TypeInferer,

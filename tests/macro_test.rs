@@ -1,7 +1,7 @@
 use lllisp::ast::{TopLevelKind, ExprKind, Literal};
 use lllisp::parser::parse_program;
 use lllisp::macro_expander::MacroExpander;
-use lllisp::interpreter::{Interpreter, Value};
+
 
 #[test]
 fn test_simple_macro() {
@@ -264,7 +264,7 @@ fn test_parse_macro_use() {
 #[test]
 fn test_interpreter_macro_expansion() {
     use lllisp::ast::{ExprKind, Literal, Span, Located};
-    use lllisp::interpreter::{Interpreter, Value, Environment};
+    use lllisp::interpreter::{Interpreter};
     
     // Create an interpreter
     let mut interpreter = Interpreter::new();

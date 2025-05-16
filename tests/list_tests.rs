@@ -1,7 +1,6 @@
 use lllisp::{
     ast::{ExprKind, Literal, TopLevelKind},
     parser::{parse_program},
-    type_inference::{TypeInferer},
 };
 
 #[test]
@@ -43,7 +42,7 @@ fn test_list_type_inference() {
     (def my_list (list "Hello" "World"))
     "#;
     
-    let program = parse_program(src).unwrap();
+    let _program = parse_program(src).unwrap();
     
     // Skip type inference for now since list function is not defined
     // let mut inferer = TypeInferer::new();
@@ -83,7 +82,7 @@ fn test_to_function_type_inference() {
     (def numbers (to 10))
     "#;
     
-    let program = parse_program(src).unwrap();
+    let _program = parse_program(src).unwrap();
     
     // Skip type inference for now since to function is not defined
     // let mut inferer = TypeInferer::new();

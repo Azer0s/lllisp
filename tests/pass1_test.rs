@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{Type, TopLevelKind},
+    ast::{TopLevelKind},
     parser::parse_program,
     type_inference::TypeInferer,
     CompilerPass1,

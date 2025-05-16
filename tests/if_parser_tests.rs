@@ -1,5 +1,5 @@
 use lllisp::{
-    ast::{ExprKind, Span},
+    ast::{ExprKind},
     parser::{self, expr_parser, parse_program},
 };
 use chumsky::prelude::*;
@@ -71,7 +71,7 @@ fn test_basic_if() {
     
     // Extract the if expression
     if let lllisp::ast::TopLevelKind::Expr(expr_kind) = &program.forms[0].node {
-        if let ExprKind::If { condition, then_branch, else_branch } = expr_kind {
+        if let ExprKind::If { condition: _, then_branch: _, else_branch } = expr_kind {
             // We expect an else branch in this case
             assert!(else_branch.is_some());
         } else {
