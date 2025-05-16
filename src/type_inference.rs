@@ -660,40 +660,21 @@ impl TypeInferer {
                 ))
             },
             ExprKind::Call { name, args } => {
-                // Special handling for operator function calls
-                if ["+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">="].contains(&name.as_str()) {
-                    // Process arguments
-                    let mut processed_args = Vec::new();
-                    for arg in args {
-                        let processed_arg = self.infer_expr_type(arg)?;
-                        processed_args.push(processed_arg);
-                    }
-                    
-                    // Return the call with processed arguments
-                    Ok(Located::new(
-                        ExprKind::Call {
-                            name: name.clone(),
-                            args: processed_args,
-                        },
-                        expr.span
-                    ))
-                } else {
-                    // Process arguments for regular function calls
-                    let mut processed_args = Vec::new();
-                    for arg in args {
-                        let processed_arg = self.infer_expr_type(arg)?;
-                        processed_args.push(processed_arg);
-                    }
-                    
-                    // Return the call with processed arguments
-                    Ok(Located::new(
-                        ExprKind::Call {
-                            name: name.clone(),
-                            args: processed_args,
-                        },
-                        expr.span
-                    ))
+                // Process arguments (for both operator and regular function calls)
+                let mut processed_args = Vec::new();
+                for arg in args {
+                    let processed_arg = self.infer_expr_type(arg)?;
+                    processed_args.push(processed_arg);
                 }
+                
+                // Return the call with processed arguments
+                Ok(Located::new(
+                    ExprKind::Call {
+                        name: name.clone(),
+                        args: processed_args,
+                    },
+                    expr.span
+                ))
             },
             ExprKind::Do(expressions) => {
                 let mut processed_expressions = Vec::new();
