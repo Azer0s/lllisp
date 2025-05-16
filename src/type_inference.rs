@@ -474,6 +474,10 @@ impl TypeInferer {
                 // If we see one, just pass it through unchanged
                 Ok(form.clone())
             },
+            TopLevelKind::Export { .. } => {
+                // Export statements don't need type inference - just declarations of which symbols to export
+                Ok(form.clone())
+            },
         }
     }
     

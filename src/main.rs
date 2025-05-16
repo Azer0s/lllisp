@@ -207,5 +207,12 @@ fn _display_form(form: &lllisp::TopLevel) {
         lllisp::TopLevelKind::Alias { name, module, function } => {
             println!("Alias: {} -> {}/{}", name, module, function);
         },
+        lllisp::TopLevelKind::Export { symbols, export_all } => {
+            if *export_all {
+                println!("Export: all symbols");
+            } else {
+                println!("Export: specific symbols - {:?}", symbols);
+            }
+        },
     }
 } 

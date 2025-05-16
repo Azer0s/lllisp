@@ -105,12 +105,17 @@ impl MacroExpander {
                     form.span,
                 )
             },
-            TopLevelKind::MacroDef { .. } => {
-                // Macros are handled in the first pass
-                panic!("Macro definitions should be handled in the first pass");
+            TopLevelKind::MacroDef { name: _, params: _, body: _ } => {
+                // For process_top_level, we don't need to remember the macro definition
+                // That happens in the first pass in process_program
+                form.clone()
             },
             TopLevelKind::Alias { .. } => {
                 // Aliases don't contain expressions with macros
+                form.clone()
+            },
+            TopLevelKind::Export { symbols: _, export_all: _ } => {
+                // Macro expansion doesn't affect export statements
                 form.clone()
             },
         }

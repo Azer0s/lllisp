@@ -99,18 +99,23 @@ impl AliasFolding {
                 )
             },
             TopLevelKind::MacroDef { name, params, body } => {
-                // Process the macro body
+                // Process the macro body to fold any aliases
                 let processed_body = self.process_expr(body);
                 
-                // Return the macro definition with the processed body
+                // Return updated macro definition
                 Located::new(
                     TopLevelKind::MacroDef {
                         name: name.clone(),
                         params: params.clone(),
                         body: processed_body,
                     },
-                    form.span,
+                    form.span
                 )
+            },
+            TopLevelKind::Export { symbols: _, export_all: _ } => {
+                // Export statements don't need alias folding
+                // Just return the original form
+                form.clone()
             },
             // Aliases are handled in the first pass
             TopLevelKind::Alias { .. } => {

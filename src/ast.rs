@@ -437,6 +437,12 @@ pub enum TopLevelKind {
         params: Vec<String>,
         body: Located<ExprKind>,
     }, // (macro name (params...) body)
+    
+    // Export statement
+    Export {
+        symbols: Vec<String>,
+        export_all: bool,
+    }, // (export symbol1 symbol2 ...) or (export :all)
 }
 
 pub type TopLevel = Located<TopLevelKind>;

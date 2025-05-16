@@ -233,13 +233,17 @@ impl Interpreter {
                 self.eval_expr_kind(expr, &self.env)
             },
             TopLevelKind::MacroDef { name, params, body } => {
-                // Create a macro value and store it in the environment
-                let macro_val = Value::Macro(Macro {
+                println!("Defining macro: {}", name);
+                
+                let macro_def = Macro {
                     params: params.clone(),
                     body: body.clone(),
-                });
-                self.env.define(name.clone(), macro_val.clone());
-                Ok(macro_val)
+                };
+                
+                // Store the macro definition
+                self.env.define(name.clone(), Value::Macro(macro_def));
+                
+                Ok(Value::Null)
             },
             TopLevelKind::Alias { name, module, function } => {
                 // In the interpreter, we'll register the alias as a special value
@@ -249,6 +253,16 @@ impl Interpreter {
                 )));
                 self.env.define(name.clone(), alias_value.clone());
                 Ok(alias_value)
+            },
+            TopLevelKind::Export { symbols, export_all } => {
+                // For interpreter, exports are just metadata - there's no actual effect
+                // Print what's being exported to show it's being processed
+                if *export_all {
+                    println!("Exporting all symbols");
+                } else {
+                    println!("Exporting symbols: {:?}", symbols);
+                }
+                Ok(Value::Null)
             },
         }
     }

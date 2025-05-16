@@ -9,6 +9,87 @@ LLLisp features a module system that allows code organization and reuse. The mod
 - Submodules and nested paths use forward slashes (e.g., `graphics/rendering/shapes.lllisp`)
 - When importing modules, the file extension is omitted
 
+## Module Compilation
+
+LLLisp treats each source file as a separate compilation unit, which compiles to a separate object file (`.o`). Each LLLisp file acts as both a header and source file simultaneously, providing declarations and implementations in a single file.
+
+### Exporting Symbols
+
+By default, definitions in a module are private to that module. To make definitions available for import by other modules, you must explicitly export them using the `export` keyword:
+
+```lisp
+(export symbol1 symbol2 ...)
+```
+
+For example:
+
+```lisp
+;; math.lllisp
+(def PI 3.14159265359)
+(def E 2.71828182846)
+
+(def square (fn [(:x f64)] f64
+  (* x x)
+))
+
+(def cube (fn [(:x f64)] f64
+  (* x x x)
+))
+
+;; Export only PI and square function
+(export PI square)
+```
+
+When another module imports this module, only the exported symbols will be accessible:
+
+```lisp
+;; main.lllisp
+(def math (use "math"))
+
+;; Can access exported symbols
+(def area (* math/PI (math/square 5.0)))
+
+;; Error: E is not exported from math
+;; (def exp-value math/E)
+
+;; Error: cube is not exported from math
+;; (def volume (math/cube 5.0))
+```
+
+You can also use multiple export statements:
+
+```lisp
+(export PI E)
+(export square cube)
+```
+
+### Exporting Everything
+
+To export all definitions from a module, pass `:all` to the `export` keyword:
+
+```lisp
+(export :all)
+```
+
+### Re-exporting Imported Symbols
+
+You can also re-export symbols imported from other modules:
+
+```lisp
+;; math-utils.lllisp
+(def math (use "math"))
+(def stats (use "statistics"))
+
+;; Re-export specific symbols from other modules
+(export math/PI stats/mean)
+
+;; Define and export a new function
+(def hypotenuse (fn [(:a f64) (:b f64)] f64
+  (math/sqrt (+ (math/square a) (math/square b)))
+))
+(export hypotenuse)
+```
+
 ## Module Import
 
 Modules are imported using the `use` keyword. There are two main types of module imports:
@@ -116,6 +197,9 @@ A LLLisp file automatically serves as a module. Any top-level definitions in a f
     (sqrt (+ (square dx) (square dy)))
   )
 ))
+
+;; Export public API
+(export square distance)
 ```
 
 `main.lllisp`:
@@ -130,6 +214,9 @@ A LLLisp file automatically serves as a module. Any top-level definitions in a f
 
 (def dist (math/distance 0.0 0.0 3.0 4.0))
 (stdio/printf "Distance from (0,0) to (3,4) is %f\n" dist)
+
+;; This would cause an error as cube is not exported
+;; (def cube-val (math/cube 5.0))
 ```
 
 ## C Interoperability
@@ -187,6 +274,9 @@ For header files, the compiler uses the system's standard include paths and any 
 (def version "1.0.0")
 (def max-connections 100)
 
+;; Export all configuration
+(export :all)
+
 ;; logger.lllisp
 (def stdio (use :header "stdio.h"))
 
@@ -197,6 +287,9 @@ For header files, the compiler uses the system's standard include paths and any 
 (def log-error (fn [(:msg str)] void
   (stdio/printf "[ERROR] %s\n" msg)
 ))
+
+;; Export the logging functions
+(export log-info log-error)
 
 ;; database.lllisp
 (def config (use "config"))
@@ -209,6 +302,9 @@ For header files, the compiler uses the system's standard include paths and any 
     true
   )
 ))
+
+;; Export only the connect function
+(export connect)
 
 ;; app.lllisp
 (def config (use "config"))
@@ -230,4 +326,7 @@ For header files, the compiler uses the system's standard include paths and any 
     0  ; Return success
   )
 ))
+
+;; Export the main function
+(export main)
 ``` 

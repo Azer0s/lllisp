@@ -1,0 +1,14 @@
+;; Define internal variables not meant to be exported
+(def internal-counter 0)
+(def internal-helper (fn (x) (* x 2)))
+
+;; Define functions and variables we want to export
+(def square (fn (x) (* x x)))
+(def distance (fn (x y) (sqrt (+ (square x) (square y)))))
+(def PI 3.14159)
+
+;; Export specific symbols
+(export square distance PI)
+
+;; To export all, you would use:
+;; (export :all) 

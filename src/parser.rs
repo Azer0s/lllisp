@@ -299,6 +299,32 @@ fn top_level_parser() -> impl Parser<char, Vec<TopLevel>, Error = Simple<char>> 
         module_import.labelled("module import"),
         alias_def.labelled("alias definition"),
         top_level_module_call.labelled("module function call"),
+        
+        // Export statement: (export symbol1 symbol2 ...) or (export :all)
+        just('(')
+            .then(just("export").padded())
+            .then(
+                // Handle :all special case
+                just(':')
+                .then(just("all").padded())
+                .map(|_| (vec![], true)) // No symbols, export_all = true
+                .or(
+                    // Handle individual symbol exports
+                    ident().padded()
+                    .repeated()
+                    .map(|symbols| (symbols, false)) // Symbol list, export_all = false
+                )
+            )
+            .then(just(')'))
+            .map(|(((_, _), (symbols, export_all)), _)| {
+                println!("Parsed export statement: export_all={}, symbols={:?}", export_all, symbols);
+                TopLevelKind::Export { symbols, export_all }
+            })
+            .map_with_span(|kind, span: Range<usize>| {
+                Located::new(kind, Span::new(span.start, span.end))
+            })
+            .labelled("export statement"),
+            
         expr_form.labelled("expression"),
     ))
     .padded()
@@ -1427,6 +1453,31 @@ mod tests {
             }
         } else {
             panic!("Expected Expr, got {:?}", program.forms[1].node);
+        }
+    }
+    
+    #[test]
+    fn test_parse_export() {
+        // Test export specific symbols
+        let src = "(export square distance)";
+        let result = parse_form(src).unwrap();
+        
+        if let TopLevelKind::Export { symbols, export_all } = result.node {
+            assert_eq!(symbols, vec!["square", "distance"]);
+            assert_eq!(export_all, false);
+        } else {
+            panic!("Expected Export, got {:?}", result.node);
+        }
+        
+        // Test export all
+        let src = "(export :all)";
+        let result = parse_form(src).unwrap();
+        
+        if let TopLevelKind::Export { symbols, export_all } = result.node {
+            assert!(symbols.is_empty());
+            assert_eq!(export_all, true);
+        } else {
+            panic!("Expected Export, got {:?}", result.node);
         }
     }
 } 
