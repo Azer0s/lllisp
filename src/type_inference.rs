@@ -481,8 +481,17 @@ impl TypeInferer {
     fn infer_expr_type(&mut self, expr: &Expr) -> Result<Expr, TypeError> {
         match &expr.node {
             ExprKind::Literal(literal) => {
-                let _ty = self.infer_literal_type(literal);
-                Ok(expr.clone())
+                match literal {
+                    Literal::Tuple(elements) => {
+                        let mut processed_elements = Vec::new();
+                        for elem in elements {
+                            let processed_elem = self.infer_expr_type(elem)?;
+                            processed_elements.push(processed_elem);
+                        }
+                        Ok(Located::new(ExprKind::Literal(Literal::Tuple(processed_elements)), expr.span))
+                    },
+                    _ => Ok(expr.clone())
+                }
             },
             ExprKind::Symbol(name) => {
                 // Check if the symbol is defined
@@ -755,14 +764,6 @@ impl TypeInferer {
                     iterator: processed_iterator,
                     body: Box::new(processed_body),
                 }, expr.span))
-            },
-            ExprKind::Literal(Literal::Tuple(elements)) => {
-                let mut processed_elements = Vec::new();
-                for elem in elements {
-                    let processed_elem = self.infer_expr_type(elem)?;
-                    processed_elements.push(processed_elem);
-                }
-                Ok(Located::new(ExprKind::Literal(Literal::Tuple(processed_elements)), expr.span))
             },
             ExprKind::DataConstructor { tag, value } => {
                 // Find a data type that contains this tag
