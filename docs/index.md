@@ -15,6 +15,14 @@ LLLisp combines the expressiveness of Lisp with the performance of low-level pro
 - Memory management control
 - Pattern matching for data types
 
+## File Extensions and Naming Conventions
+
+- LLLisp source files use the `.lllisp` or `.l3` file extension
+- Identifiers and file names use kebab-case (words separated by hyphens)
+- Module and submodule names are separated by forward slashes (e.g., `graphics/rendering`)
+- Variable and function names are typically lowercase with hyphens (e.g., `calculate-distance`)
+- Type names are typically lowercase with hyphens (e.g., `point-2d`)
+
 ## Documentation Sections
 
 ### Language Basics

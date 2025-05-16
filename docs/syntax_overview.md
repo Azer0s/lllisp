@@ -2,6 +2,15 @@
 
 LLLisp is a low-level Lisp-like language with a focus on performance and C interoperability. This document provides an overview of the basic syntax elements.
 
+## File Extensions and Naming Conventions
+
+- LLLisp source files use the `.lllisp` or `.l3` file extension
+- Source code follows a consistent naming convention:
+  - Identifiers use kebab-case (words separated by hyphens)
+  - Module and submodule names are separated by forward slashes (e.g., `graphics/rendering/draw-triangle`)
+  - Variable and function names are typically lowercase with hyphens (e.g., `calculate-distance`)
+  - Type names are also lowercase with hyphens (e.g., `point-2d`)
+
 ## Basic Syntax
 
 LLLisp uses S-expressions with a Lisp-like syntax. All expressions are enclosed in parentheses, with the first element typically being an operator or function name.

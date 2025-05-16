@@ -2,6 +2,13 @@
 
 LLLisp features a module system that allows code organization and reuse. The module system also provides C interoperability through external function mapping. This document describes how to use modules in LLLisp.
 
+## File Extensions and Module Naming
+
+- LLLisp source files use the `.lllisp` or `.l3` file extension
+- Module names use kebab-case (e.g., `math-utils.lllisp`)
+- Submodules and nested paths use forward slashes (e.g., `graphics/rendering/shapes.lllisp`)
+- When importing modules, the file extension is omitted
+
 ## Module Import
 
 Modules are imported using the `use` keyword. There are two main types of module imports:
