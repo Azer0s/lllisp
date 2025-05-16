@@ -1,8 +1,8 @@
 use lllisp::{
-    ast::{ExprKind, TopLevelKind, Literal},
+    ast::{ExprKind, TopLevelKind},
     parser::parse_program,
-    alias_folding::AliasFolding,
     type_inference::TypeInferer,
+    alias_folding::AliasFolding,
 };
 
 #[test]
@@ -25,27 +25,13 @@ fn test_basic_alias() {
     // Check that we have the variable definition, the alias, and the function call
     assert_eq!(program.forms.len(), 3, "Expected 3 forms (def, alias, call)");
     
-    // Check the variable definition that uses the module
-    if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
+    // Check the module import
+    if let TopLevelKind::ModuleImport { name, path, is_header } = &program.forms[0].node {
         assert_eq!(name, "stdio");
-        if let ExprKind::Call { name, args } = &value.node {
-            assert_eq!(name, "use");
-            assert_eq!(args.len(), 2);
-            if let ExprKind::Literal(Literal::Atom(atom)) = &args[0].node {
-                assert_eq!(atom, "header");
-            } else {
-                panic!("Expected Atom literal");
-            }
-            if let ExprKind::Literal(Literal::String(path)) = &args[1].node {
-                assert_eq!(path, "stdio.h");
-            } else {
-                panic!("Expected String literal");
-            }
-        } else {
-            panic!("Expected Call expression");
-        }
+        assert_eq!(path, "stdio.h");
+        assert!(is_header);
     } else {
-        panic!("Expected VarDef, got {:?}", program.forms[0].node);
+        panic!("Expected ModuleImport, got {:?}", program.forms[0].node);
     }
     
     // Check the alias definition
@@ -83,10 +69,12 @@ fn test_basic_alias() {
     assert_eq!(folded_program.forms.len(), 2, "Expected 2 forms after folding (def, call)");
     
     // Check the module definition is preserved
-    if let TopLevelKind::VarDef { name, .. } = &folded_program.forms[0].node {
+    if let TopLevelKind::ModuleImport { name, path, is_header } = &folded_program.forms[0].node {
         assert_eq!(name, "stdio");
+        assert_eq!(path, "stdio.h");
+        assert!(is_header);
     } else {
-        panic!("Expected VarDef, got {:?}", folded_program.forms[0].node);
+        panic!("Expected ModuleImport, got {:?}", folded_program.forms[0].node);
     }
     
     // Check the function call is now a module call

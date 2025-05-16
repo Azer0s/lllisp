@@ -1,8 +1,8 @@
 ;; Test file for nested module paths and calls
 
 ;; Import modules
-(def graphics (use "graphics.ll"))
-(def utils (use "utils.ll"))
+(def graphics (use "graphics"))
+(def utils (use "utils"))
 
 ;; Call a function in a nested module hierarchy
 (graphics/ui/button/render "Click Me" 100 200 150 50)

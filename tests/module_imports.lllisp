@@ -13,7 +13,7 @@
 (def subdir/foo (use "subdir/foo"))
 
 ;; Using the imported modules
-(stdio/printf "Hello, world!\n")
+(stdio/printf "Hello, world!")
 
 (def result (other/fib 10))
 

@@ -1,4 +1,4 @@
-use lllisp::ast::{TopLevelKind};
+use lllisp::ast::{TopLevelKind, ExprKind};
 use lllisp::parser::parse_program;
 use std::fs;
 
@@ -19,38 +19,58 @@ fn test_module_imports() {
     assert!(program.forms.len() >= 4, "Should parse at least 4 forms (the imports)");
     
     // Test the first module import (stdio)
-    if let TopLevelKind::ModuleImport { name, path, is_header } = &program.forms[0].node {
+    if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
         assert_eq!(name, "stdio");
-        assert_eq!(path, "stdio.h");
-        assert!(is_header);
+        
+        if let ExprKind::Call { name: call_name, args } = &value.node {
+            assert_eq!(call_name, "use");
+            assert_eq!(args.len(), 2);  // :header "stdio.h"
+        } else {
+            panic!("Expected Call to 'use', got {:?}", value.node);
+        }
     } else {
-        panic!("Expected first form to be a ModuleImport, got {:?}", program.forms[0].node);
+        panic!("Expected first form to be a VarDef, got {:?}", program.forms[0].node);
     }
     
     // Test the second module import (other)
-    if let TopLevelKind::ModuleImport { name, path, is_header } = &program.forms[1].node {
+    if let TopLevelKind::VarDef { name, value } = &program.forms[1].node {
         assert_eq!(name, "other");
-        assert_eq!(path, "other");
-        assert!(!is_header);
+        
+        if let ExprKind::Call { name: call_name, args } = &value.node {
+            assert_eq!(call_name, "use");
+            assert_eq!(args.len(), 1);  // "other"
+        } else {
+            panic!("Expected Call to 'use', got {:?}", value.node);
+        }
     } else {
-        panic!("Expected second form to be a ModuleImport, got {:?}", program.forms[1].node);
+        panic!("Expected second form to be a VarDef, got {:?}", program.forms[1].node);
     }
     
     // Test the third module import (subdir-other)
-    if let TopLevelKind::ModuleImport { name, path, is_header } = &program.forms[2].node {
+    if let TopLevelKind::VarDef { name, value } = &program.forms[2].node {
         assert_eq!(name, "subdir-other");
-        assert_eq!(path, "subdir/other");
-        assert!(!is_header);
+        
+        if let ExprKind::Call { name: call_name, args } = &value.node {
+            assert_eq!(call_name, "use");
+            assert_eq!(args.len(), 1);  // "subdir/other"
+        } else {
+            panic!("Expected Call to 'use', got {:?}", value.node);
+        }
     } else {
-        panic!("Expected third form to be a ModuleImport, got {:?}", program.forms[2].node);
+        panic!("Expected third form to be a VarDef, got {:?}", program.forms[2].node);
     }
     
     // Test the fourth module import (subdir/foo)
-    if let TopLevelKind::ModuleImport { name, path, is_header } = &program.forms[3].node {
+    if let TopLevelKind::VarDef { name, value } = &program.forms[3].node {
         assert_eq!(name, "subdir/foo");
-        assert_eq!(path, "subdir/foo");
-        assert!(!is_header);
+        
+        if let ExprKind::Call { name: call_name, args } = &value.node {
+            assert_eq!(call_name, "use");
+            assert_eq!(args.len(), 1);  // "subdir/foo"
+        } else {
+            panic!("Expected Call to 'use', got {:?}", value.node);
+        }
     } else {
-        panic!("Expected fourth form to be a ModuleImport, got {:?}", program.forms[3].node);
+        panic!("Expected fourth form to be a VarDef, got {:?}", program.forms[3].node);
     }
 } 

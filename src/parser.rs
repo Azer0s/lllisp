@@ -10,23 +10,62 @@ fn span_from_range(range: Range<usize>) -> Span {
     Span::new(range.start, range.end)
 }
 
+// Helper function to transform VarDef with call to "use" into ModuleImport
+fn transform_var_def_to_module_import(form: &TopLevel) -> TopLevel {
+    if let TopLevelKind::VarDef { name, value } = &form.node {
+        if let ExprKind::Call { name: call_name, args } = &value.node {
+            if call_name == "use" {
+                let is_header = args.len() > 1 && 
+                    if let ExprKind::Literal(Literal::Atom(atom)) = &args[0].node {
+                        atom == "header"
+                    } else {
+                        false
+                    };
+                
+                let path_index = if is_header { 1 } else { 0 };
+                if path_index < args.len() {
+                    if let ExprKind::Literal(Literal::String(path)) = &args[path_index].node {
+                        println!("Transforming VarDef to ModuleImport: {} -> {} (header: {})", 
+                            name, path, is_header);
+                        return Located::new(
+                            TopLevelKind::ModuleImport {
+                                name: name.clone(),
+                                path: path.clone(),
+                                is_header,
+                            },
+                            form.span,
+                        );
+                    }
+                }
+            }
+        }
+    }
+    
+    // If not a module import or couldn't extract path, return original form
+    form.clone()
+}
+
 // Parse a complete LLLisp program
 pub fn parse_program(src: &str) -> Result<Program, Vec<Simple<char>>> {
-    let processed_src = preprocess_source(src);
+    println!("Parsing source: '{}'", src);
     
-    // Use the top_level_parser to parse all top-level forms
-    println!("Parsing source: '{}'", processed_src);
+    // Preprocess the source to standardize
+    let preprocessed = preprocess_source(src);
     
-    // We need to handle multiple top-level forms
-    // Use top_level_parser directly which returns a Vec<TopLevel>
-    let parser = top_level_parser()
-        .then_ignore(end())
-        .map(|forms| {
+    // Parse the program
+    match top_level_parser().parse(preprocessed.as_str()) {
+        Ok(forms) => {
             println!("Successfully parsed {} top-level forms", forms.len());
-            Program { forms }
-        });
-    
-    parser.parse(processed_src.as_str())
+            
+            // Transform VarDef with use calls into ModuleImport
+            let transformed_forms = forms.into_iter()
+                .map(|form| transform_var_def_to_module_import(&form))
+                .collect();
+            
+            Ok(Program { forms: transformed_forms })
+        }
+        Err(e) => Err(e),
+    }
 }
 
 // Parse a single top-level form
@@ -705,7 +744,7 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
                         ExprKind::ModuleCall { 
                             module, 
                             function, 
-                            args 
+                            args: args.clone() 
                         },
                         Span::new(span.start, span.end)
                     )
@@ -1363,22 +1402,13 @@ mod tests {
         let program = parse_program(program_src).unwrap();
         assert_eq!(program.forms.len(), 2);
         
-        // Check the variable definition that uses the module
-        if let TopLevelKind::VarDef { name, value } = &program.forms[0].node {
+        // Check the module import
+        if let TopLevelKind::ModuleImport { name, path, is_header } = &program.forms[0].node {
             assert_eq!(name, "math");
-            if let ExprKind::Call { name, args } = &value.node {
-                assert_eq!(name, "use");
-                assert_eq!(args.len(), 1);
-                if let ExprKind::Literal(Literal::String(path)) = &args[0].node {
-                    assert_eq!(path, "math.ll");
-                } else {
-                    panic!("Expected String literal, got {:?}", args[0].node);
-                }
-            } else {
-                panic!("Expected Call expression, got {:?}", value.node);
-            }
+            assert_eq!(path, "math.ll");
+            assert!(!is_header);
         } else {
-            panic!("Expected VarDef, got {:?}", program.forms[0].node);
+            panic!("Expected ModuleImport, got {:?}", program.forms[0].node);
         }
         
         // Check the second form is a module call

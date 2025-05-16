@@ -1,7 +1,7 @@
 ;; Test file for module imports and function calls
 
 (def stdio (use :header "stdio.h"))
-(def math (use "math.ll"))
+(def math (use "math"))
 
 ;; Call stdio/printf
 (stdio/printf "This is a test: %d\n" 42)

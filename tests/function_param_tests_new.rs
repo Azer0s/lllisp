@@ -1,7 +1,5 @@
-use lllisp::{
-    ast::{ExprKind, TopLevelKind},
-    parser::{parse_program},
-};
+use lllisp::ast::{ExprKind, TopLevelKind};
+use lllisp::parser::parse_program;
 
 #[test]
 fn test_basic_function() {
