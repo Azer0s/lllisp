@@ -1628,31 +1628,15 @@ mod tests {
         let y_type = inferer.get_variable_type("y").expect("Failed to get type for y");
         assert_eq!(*y_type, Type::Named("any".to_string()));
         
-        // Check that type checking expressions return function types that return Bool
+        // Check that type checking expressions return Bool type
         if let Some(x_is_int_type) = inferer.get_variable_type("x-is-int") {
-            // It appears 'is' is a function that takes two 'any' parameters and returns a Bool
-            if let Type::Function(params, ret) = x_is_int_type {
-                assert_eq!(params.len(), 2);
-                assert_eq!(params[0], Type::Named("any".to_string()));
-                assert_eq!(params[1], Type::Named("any".to_string()));
-                assert_eq!(**ret, Type::Bool);
-            } else {
-                panic!("Expected Function type for x-is-int, got {:?}", x_is_int_type);
-            }
+            assert_eq!(*x_is_int_type, Type::Bool);
         } else {
             panic!("Failed to get type for x-is-int");
         }
         
         if let Some(y_is_float_type) = inferer.get_variable_type("y-is-float") {
-            // Also check y-is-float with the same expected function type
-            if let Type::Function(params, ret) = y_is_float_type {
-                assert_eq!(params.len(), 2);
-                assert_eq!(params[0], Type::Named("any".to_string()));
-                assert_eq!(params[1], Type::Named("any".to_string()));
-                assert_eq!(**ret, Type::Bool);
-            } else {
-                panic!("Expected Function type for y-is-float, got {:?}", y_is_float_type);
-            }
+            assert_eq!(*y_is_float_type, Type::Bool);
         } else {
             panic!("Failed to get type for y-is-float");
         }

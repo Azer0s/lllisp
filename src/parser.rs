@@ -5,6 +5,11 @@ use crate::ast::{
     ExprKind, Literal, Program, Span, TopLevel, TopLevelKind, Type, Located, MatchCase
 };
 
+// Add this helper function at the top level (after imports)
+fn span_from_range(range: Range<usize>) -> Span {
+    Span::new(range.start, range.end)
+}
+
 // Parse a complete LLLisp program
 pub fn parse_program(src: &str) -> Result<Program, Vec<Simple<char>>> {
     let processed_src = preprocess_source(src);
@@ -476,7 +481,28 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
     recursive(|expr| {
         let literal = literal_parser().map(|lit| Located::new(ExprKind::Literal(lit), Span::new(0, 0)));
         
-        let symbol = ident().map(|name| Located::new(ExprKind::Symbol(name), Span::new(0, 0)));
+        let symbol = ident()
+            .map(|s| {
+                // Check if it contains a slash for module/function
+                if s.contains('/') {
+                    let parts: Vec<&str> = s.split('/').collect();
+                    if parts.len() == 2 {
+                        ExprKind::ModuleCall {
+                            module: parts[0].to_string(),
+                            function: parts[1].to_string(),
+                            args: vec![],
+                        }
+                    } else {
+                        ExprKind::Symbol(s)
+                    }
+                } else {
+                    ExprKind::Symbol(s)
+                }
+            })
+            .map_with_span(|node, span| Located {
+                node,
+                span: span_from_range(span),
+            });
         
         // Macro parameter list: [param1 param2 ...]
         let _macro_param_list = just('[')
@@ -668,26 +694,31 @@ pub fn expr_parser() -> impl Parser<char, Located<ExprKind>, Error = Simple<char
             .then(expr.clone().repeated())
             .then(just(')'))
             .map_with_span(|(((_, name), args), _), span: Range<usize>| {
-                // Special handling for macro
-                if name == "macro" && args.len() >= 1 {
-                    // Check if the first argument has square brackets (Tuple literal from macro_param_list)
-                    println!("Found macro call, checking for parameter list");
+                // Check if it's a module call (contains a slash)
+                if let Some(slash_pos) = name.rfind('/') {
+                    let module = name[..slash_pos].to_string();
+                    let function = name[slash_pos+1..].to_string();
+                    println!("Parsed module call via slash notation: {}/{} with {} args", module, function, args.len());
                     
-                    // Parse the args for macro parameters and body
-                    if let Some(_body) = args.get(1) {
-                        println!("Parsed macro call with parameter list and body");
-                    }
+                    // Convert to ModuleCall
+                    Located::new(
+                        ExprKind::ModuleCall { 
+                            module, 
+                            function, 
+                            args 
+                        },
+                        Span::new(span.start, span.end)
+                    )
+                } else {
+                    // Regular function call
+                    Located::new(
+                        ExprKind::Call {
+                            name,
+                            args,
+                        },
+                        Span::new(span.start, span.end)
+                    )
                 }
-                
-                println!("Parsed function call: {} with {} args", name, args.len());
-                
-                Located::new(
-                    ExprKind::Call {
-                        name,
-                        args,
-                    },
-                    Span::new(span.start, span.end)
-                )
             });
 
         // Memory operations: (addr expr)
